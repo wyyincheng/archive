@@ -91,6 +91,7 @@ func archive(version string) {
 func sync() {
 	success, fetchResult := excute("git fetch")
 	if success {
+
 		println(fetchResult)
 	}
 }
