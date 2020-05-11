@@ -198,6 +198,7 @@ func fetchLatestCommit(sort string, info string) string {
 	} else if sort == "tag" {
 
 	}
+	fmt.Println("fetch latest commit failure")
 	return ""
 }
 
