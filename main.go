@@ -15,57 +15,73 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var app = cli.NewApp()
+
+var archiveInfo = Archive{
+	CLI:     app.Version,
+	Version: "v9.7.0",
+	Time:    time.Now().Unix(),
+	Status:  0,
+}
+
 func main() {
 
-	app := &cli.App{
-		Name:  "archive",
-		Usage: "archive appstore latest version which has been published.",
-		Action: func(c *cli.Context) error {
-			fmt.Println("start archive")
-			archive(os.Args[1])
-			return nil
+	buildCLI()
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func buildCLI() {
+	app.Name = "archive"
+	app.Usage = "archive appstore latest version which has been published."
+	app.Action = func(c *cli.Context) error {
+		fmt.Println("start archive")
+		archive(os.Args[1])
+		return nil
+	}
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:  "project,p",
+			Value: "niuwa-ios",
+			Usage: "Project you will archive.",
 		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "project,p",
-				Value: "niuwa-ios",
-				Usage: "Project you will archive.",
-			},
-			&cli.StringFlag{
-				Name:  "version,v",
-				Usage: "project version you will archive.",
+		&cli.StringFlag{
+			Name:  "version,v",
+			Usage: "project version you will archive.",
+		},
+	}
+	app.Commands = []*cli.Command{
+		{
+			Name:  "lock",
+			Usage: "lock tag or branch",
+			Action: func(c *cli.Context) error {
+				fmt.Println("lock tag or branch")
+				return nil
 			},
 		},
-		Commands: []*cli.Command{
-			{
-				Name:  "lock",
-				Usage: "lock tag or branch",
-				Action: func(c *cli.Context) error {
-					fmt.Println("lock tag or branch")
-					return nil
-				},
+		{
+			Name:  "clean",
+			Usage: "clean tags and branches after archive",
+			Action: func(c *cli.Context) error {
+				return nil
 			},
-			{
-				Name:  "clean",
-				Usage: "clean tags and branches after archive",
-				Action: func(c *cli.Context) error {
-					return nil
-				},
+		},
+		{
+			Name:  "abort",
+			Usage: "rollback archive which version you given",
+			Action: func(c *cli.Context) error {
+				return nil
 			},
-			{
-				Name:  "abort",
-				Usage: "rollback archive which version you given",
-				Action: func(c *cli.Context) error {
-					return nil
-				},
-			},
-			{
-				Name:  "test",
-				Usage: "test cmd",
-				Action: func(c *cli.Context) error {
-					test()
-					return nil
-				},
+		},
+		{
+			Name:  "test",
+			Usage: "test cmd",
+			Action: func(c *cli.Context) error {
+				test()
+				return nil
 			},
 		},
 	}
@@ -73,10 +89,6 @@ func main() {
 	// sort.Sort(cli.FlagsByName(app.Flags))
 	// sort.Sort(cli.CommandsByName(app.Commands))
 
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func archive(version string) {
@@ -88,6 +100,8 @@ func archive(version string) {
 
 	*/
 	checkCMD("git")
+	archiveInfo.User = gitConfig("user.name")
+	archiveInfo.Email = gitConfig("user.email")
 	sync()
 	merge("master", version)
 }
@@ -100,7 +114,7 @@ func sync() {
 	}
 }
 
-func merge(target string, from string) {
+func merge(target string, version string) {
 	/**
 	1.分支检测，target、from
 	2.分支切换 target
@@ -108,18 +122,30 @@ func merge(target string, from string) {
 	4.记录并merge
 	5.同步
 	*/
-	success, branch := search(from)
+	success, branch := search(version)
 	if success {
 
+		archiveInfo.Version = version
+		archiveInfo.Branch = branch
 		// -f use checkout -f
 		// ohter checkout "Your branch is up to date"
 
 		excute("git checkout -f")
 		excute("git checkout " + target)
 		excute("git pull")
+		archiveInfo.Commit = fetchLatestCommit("branch", target)
+		branchInfo := Branch{
+			Name:   branch,
+			Commit: fetchLatestCommit("branch", branch),
+		}
 		mergeSuccess, _ := excute("git merge --no-ff " + branch)
 		if mergeSuccess {
 			excute("git push")
+			fmt.Println(branchInfo)
+			fmt.Println(fetchLatestCommit("branch", branch))
+			// archiveInfo.branches = []Branch{
+			// 	&branchInfo
+			// }
 		} else {
 			print("auto merge faulure. ")
 			// abort(mergeResult)
@@ -144,7 +170,12 @@ func search(branch string) (bool, string) {
 	return false, ""
 }
 
-func backup(sort string, info string) string {
+func gitConfig(key string) string {
+	_, config := excute("git config --get " + key)
+	return config
+}
+
+func fetchLatestCommit(sort string, info string) string {
 	if sort == "branch" {
 		success, result := excute("git branch -r -v")
 		if success {
@@ -219,7 +250,7 @@ func write(info Archive) {
 
 func test() {
 	info := Archive{
-		Env:     "1.0.0",
+		CLI:     "1.0.0",
 		Version: "v9.7.0",
 		User:    "yc",
 		Time:    time.Now().Unix(),
@@ -237,9 +268,12 @@ func test() {
 
 //Archive 归档信息
 type Archive struct {
-	Env      string
+	CLI      string
 	Version  string
+	Branch   string
+	Commit   string
 	User     string
+	Email    string
 	branches []Branch
 	tags     []Tag
 	Time     int64
