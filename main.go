@@ -120,16 +120,7 @@ func archive(target string, version string) {
 	checkCMD("git")
 	archiveInfo.User = gitConfig("user.name")
 	archiveInfo.Email = gitConfig("user.email")
-	sync()
-	merge("master", version)
-}
-
-func sync() {
-	success, fetchResult := excute("git fetch")
-	if success {
-
-		println(fetchResult)
-	}
+	merge(target, version)
 }
 
 func merge(target string, version string) {
@@ -149,6 +140,7 @@ func merge(target string, version string) {
 		// ohter checkout "Your branch is up to date"
 
 		excute("git checkout -f")
+		excute("git fetch")
 		excute("git checkout " + target)
 		excute("git pull")
 		archiveInfo.Commit = fetchLatestCommit("branch", target)
