@@ -37,7 +37,6 @@ func main() {
 func buildCLI() {
 	app.Name = "archive"
 	app.Usage = "archive appstore latest version which has been published."
-	app.Version = "0.0.1"
 	app.Action = func(c *cli.Context) error {
 		// fmt.Println("start archive")
 		// fmt.Println("into:", c.String("into"))
