@@ -159,7 +159,7 @@ func merge(target string, version string) {
 			// }
 		} else {
 			print("auto merge faulure. ")
-			// abort(mergeResult)
+			abort("merge", "")
 		}
 	}
 }
@@ -205,8 +205,14 @@ func fetchLatestCommit(sort string, info string) string {
 	return ""
 }
 
-func abort() {
+func abort(action string, commit string) {
+	if action == "branch" {
 
+	} else if action == "tag" {
+
+	} else if action == "merge" {
+		excute("git merge --abort", false)
+	}
 }
 
 func clean() {
