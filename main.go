@@ -117,7 +117,7 @@ func merge(target string, from string) {
 		if mergeSuccess {
 			excute("git push")
 		} else {
-			print("auto merge faulure.")
+			print("auto merge faulure. ")
 			// abort(mergeResult)
 		}
 		fmt.Printf("merge result: '%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
