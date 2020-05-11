@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -90,8 +89,10 @@ func archive(version string) {
 }
 
 func sync() {
-	fetchResult := excute("git fetch")
-	println(fetchResult)
+	success, fetchResult := excute("git fetch")
+	if success {
+		println(fetchResult)
+	}
 }
 
 func merge(target string, from string) {
@@ -102,29 +103,58 @@ func merge(target string, from string) {
 	4.记录并merge
 	5.同步
 	*/
-	branch, err := search(from)
-	if err == nil {
+	success, branch := search(from)
+	if success {
 		excute("git checkout -f")
-		excute("git checkout -B " + strings.Replace(branch, "origin/", "", -1) + " " + branch)
-		excute("git pull")
 		excute("git checkout " + target)
 		excute("git pull")
-		excute("git merge --no-ff " + branch)
-        
+		beforCommit1 := backup("branch", branch)
+		beforCommit2 := backup("branch", "master")
+		mergeSuccess, _ := excute("git merge --no-ff " + branch)
+		afterCommit3 := backup("branch", branch)
+		afterCommit4 := backup("branch", "master")
+		if mergeSuccess {
+			excute("git push")
+		} else {
+			print("auto merge faulure.")
+			// abort(mergeResult)
+		}
+		fmt.Printf("'%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
 	}
 }
 
-func search(branch string) (string, error) {
+func search(branch string) (bool, string) {
+	success, searchResult := excute("git branch -r")
+	if success == false {
+		return false, ""
+	}
 	// result := excute("git", "branch", "-r", "|", "grep", branch)
-	branches := strings.Split(excute("git branch -r"), "\n")
+	branches := strings.Split(searchResult, "\n")
 	for _, info := range branches {
 		result := strings.Replace(info, " ", "", -1)
 		if strings.HasSuffix(result, branch) {
-			return result, nil
+			return true, result
 		}
 	}
 	//deal error
-	return "", errors.New("branch not found")
+	return false, ""
+}
+
+func backup(sort string, info string) string {
+	if sort == "branch" {
+		success, result := excute("git show --decorate-refs " + info)
+		if success {
+			commitInfos := strings.Split(result, "\n")
+			for _, commit := range commitInfos {
+				if strings.HasPrefix(commit, "commit ") {
+					return strings.Replace(commit, "commit ", "", -1)
+				}
+			}
+		}
+	} else if sort == "tag" {
+
+	}
+	return ""
 }
 
 func abort() {
@@ -150,7 +180,7 @@ func checkCMD(cmd string) {
 	}
 }
 
-func excute(cmdStr string) string {
+func excute(cmdStr string) (bool, string) {
 	fmt.Printf("cmd run: '%s'\n", cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
@@ -164,10 +194,11 @@ func excute(cmdStr string) string {
 		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
 		log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
 		// os.Exit(600)
+		return false, errStr
 	}
 	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
 	//TODO: log 、 notification
-	return outStr
+	return true, outStr
 }
 
 func test() {
