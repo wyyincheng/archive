@@ -85,7 +85,7 @@ func archive(version string) {
 	*/
 	checkCMD("git")
 	sync()
-	merge("master", version)
+	merge("develop", version)
 }
 
 func sync() {
