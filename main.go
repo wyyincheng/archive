@@ -143,12 +143,13 @@ func search(branch string) (bool, string) {
 
 func backup(sort string, info string) string {
 	if sort == "branch" {
-		success, result := excute("git show --decorate-refs " + info)
+		success, result := excute("git branch -r -v")
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
-				if strings.HasPrefix(commit, "commit ") {
-					return strings.Replace(commit, "commit ", "", -1)
+				if strings.HasPrefix(commit, info+" ") {
+					infos := strings.Replace(commit, info+" ", "", 1)
+					return strings.Split(infos, " ")[0]
 				}
 			}
 		}
