@@ -120,16 +120,7 @@ func archive(target string, version string) {
 	checkCMD("git")
 	archiveInfo.User = gitConfig("user.name")
 	archiveInfo.Email = gitConfig("user.email")
-	sync()
-	merge("develop", version)
-}
-
-func sync() {
-	success, fetchResult := excute("git fetch")
-	if success {
-
-		println(fetchResult)
-	}
+	merge(target, version)
 }
 
 func merge(target string, version string) {
@@ -148,17 +139,18 @@ func merge(target string, version string) {
 		// -f use checkout -f
 		// ohter checkout "Your branch is up to date"
 
-		excute("git checkout -f")
-		excute("git checkout " + target)
-		excute("git pull")
+		excute("git checkout -f", false)
+		excute("git fetch", false)
+		excute("git checkout "+target, false)
+		excute("git pull", false)
 		archiveInfo.Commit = fetchLatestCommit("branch", target)
 		branchInfo := Branch{
 			Name:   branch,
 			Commit: fetchLatestCommit("branch", branch),
 		}
-		mergeSuccess, _ := excute("git merge --no-ff " + branch)
+		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
-			excute("git push")
+			excute("git push", false)
 			fmt.Println(branchInfo)
 			fmt.Println(fetchLatestCommit("branch", branch))
 			// archiveInfo.branches = []Branch{
@@ -166,13 +158,13 @@ func merge(target string, version string) {
 			// }
 		} else {
 			print("auto merge faulure. ")
-			// abort(mergeResult)
+			abort("merge", "")
 		}
 	}
 }
 
 func search(branch string) (bool, string) {
-	success, searchResult := excute("git branch -r")
+	success, searchResult := excute("git branch -r", false)
 	if success == false {
 		return false, ""
 	}
@@ -189,13 +181,13 @@ func search(branch string) (bool, string) {
 }
 
 func gitConfig(key string) string {
-	_, config := excute("git config --get " + key)
+	_, config := excute("git config --get "+key, false)
 	return config
 }
 
 func fetchLatestCommit(sort string, info string) string {
 	if sort == "branch" {
-		success, result := excute("git branch -r -v")
+		success, result := excute("git branch -r -v", false)
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
@@ -212,8 +204,14 @@ func fetchLatestCommit(sort string, info string) string {
 	return ""
 }
 
-func abort() {
+func abort(action string, commit string) {
+	if action == "branch" {
 
+	} else if action == "tag" {
+
+	} else if action == "merge" {
+		excute("git merge --abort", false)
+	}
 }
 
 func clean() {
@@ -235,7 +233,7 @@ func checkCMD(cmd string) {
 	}
 }
 
-func excute(cmdStr string) (bool, string) {
+func excute(cmdStr string, silent bool) (bool, string) {
 	fmt.Printf("cmd run: '%s'\n", cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
@@ -247,8 +245,10 @@ func excute(cmdStr string) (bool, string) {
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
 		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
-		log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
-		// os.Exit(600)
+		if silent == false {
+			//静默处理：正常返回处理结果，不结束程序
+			log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
+		}
 		return false, errStr
 	}
 	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
