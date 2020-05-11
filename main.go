@@ -90,7 +90,7 @@ func archive(version string) {
 }
 
 func sync() {
-	fetchResult := excute("git", "fetch")
+	fetchResult := excute("git fetch")
 	println(fetchResult)
 }
 
@@ -104,18 +104,18 @@ func merge(target string, from string) {
 	*/
 	branch, err := search(from)
 	if err == nil {
-		excute("git", "checkout", "-f")
-		excute("git", "checkout", "-B", strings.Replace(branch, "origin/", "", -1), branch)
-		excute("git", "pull")
-		excute("git", "checkout", target)
-		excute("git", "pull")
-		excute("git", "merge", "--no-ff", branch)
+		excute("git checkout -f")
+		excute("git checkout -B " + strings.Replace(branch, "origin/", "", -1) + " " + branch)
+		excute("git pull")
+		excute("git checkout " + target)
+		excute("git pull")
+		excute("git merge --no-ff " + branch)
 	}
 }
 
 func search(branch string) (string, error) {
 	// result := excute("git", "branch", "-r", "|", "grep", branch)
-	branches := strings.Split(excute("git", "branch", "-r"), "\n")
+	branches := strings.Split(excute("git branch -r"), "\n")
 	for _, info := range branches {
 		result := strings.Replace(info, " ", "", -1)
 		if strings.HasSuffix(result, branch) {
@@ -149,17 +149,19 @@ func checkCMD(cmd string) {
 	}
 }
 
-func excute(name string, arg ...string) string {
-	fmt.Printf("cmd run: '%s' '%s'\n", name, arg)
-	cmd := exec.Command(name, arg...)
+func excute(cmdStr string) string {
+	fmt.Printf("cmd run: '%s'\n", cmdStr)
+	branches := strings.Split(cmdStr, " ")
+	cmd := exec.Command(branches[0], branches[1:]...)
+	// cmd := exec.Command(name, arg...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
-		fmt.Printf("'%s' failed : '%s'", name, errStr)
-		log.Fatalf("cmd('%s').Run() failed with %s\n", name, err)
+		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
+		log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
 		// os.Exit(600)
 	}
 	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
