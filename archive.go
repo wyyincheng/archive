@@ -231,7 +231,7 @@ func checkCMD(cmd string) {
 }
 
 func excute(cmdStr string, silent bool) (bool, string) {
-	fmt.Printf("cmd run: '%s'\n", cmdStr)
+	// fmt.Printf("cmd run: '%s'\n", cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
 	// cmd := exec.Command(name, arg...)
