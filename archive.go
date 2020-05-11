@@ -144,20 +144,17 @@ func merge(target string, version string) {
 		excute("git checkout "+target, false)
 		excute("git pull", false)
 		archiveInfo.Commit = fetchLatestCommit("branch", target)
-		branchInfo := Branch{
-			Name:   branch,
-			Commit: fetchLatestCommit("branch", branch),
-		}
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
-			fmt.Println(branchInfo)
-			fmt.Println(fetchLatestCommit("branch", branch))
-			// archiveInfo.branches = []Branch{
-			// 	&branchInfo
-			// }
+			archiveInfo.branches = []Branch{
+				{
+					Name:   branch,
+					Commit: fetchLatestCommit("branch", branch),
+				},
+			}
+			write(archiveInfo)
 		} else {
-			print("auto merge faulure. ")
 			abort("merge", "")
 		}
 	}
