@@ -106,6 +106,10 @@ func merge(target string, from string) {
 	*/
 	success, branch := search(from)
 	if success {
+
+		// -f use checkout -f
+		// ohter checkout "Your branch is up to date"
+
 		excute("git checkout -f")
 		excute("git checkout " + target)
 		excute("git pull")
@@ -147,8 +151,9 @@ func backup(sort string, info string) string {
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
-				if strings.HasPrefix(commit, info+" ") {
-					infos := strings.Replace(commit, info+" ", "", 1)
+				trimStr := strings.Trim(commit, " ")
+				if strings.HasPrefix(trimStr, info+" ") {
+					infos := strings.Replace(trimStr, info+" ", "", 1)
 					return strings.Split(infos, " ")[0]
 				}
 			}
