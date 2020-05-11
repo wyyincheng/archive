@@ -98,7 +98,9 @@ func buildCLI() {
 			Name:  "test",
 			Usage: "test cmd",
 			Action: func(c *cli.Context) error {
-				test()
+				target := c.String("into")
+				version := c.String("v")
+				test(target, version)
 				return nil
 			},
 		},
@@ -269,22 +271,10 @@ func write(info Archive) {
 	}
 }
 
-func test() {
-	info := Archive{
-		CLI:     "1.0.0",
-		Version: "v9.7.0",
-		User:    "yc",
-		Time:    time.Now().Unix(),
-		Status:  0,
-	}
-
-	infoJSON, _ := json.Marshal(info)
-	if infoJSON != nil {
-		pwd, _ := os.Getwd()
-		filePath := path.Join(pwd, "backup")
-		os.MkdirAll(filePath, os.ModePerm)
-		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
-	}
+func test(target string, version string) {
+	_, branch := search(version)
+	commit := fetchLatestCommit("branch", branch)
+	fmt.Println("commit: " + commit)
 }
 
 //Archive 归档信息
