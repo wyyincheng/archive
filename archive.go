@@ -184,7 +184,9 @@ func gitConfig(key string) string {
 
 func fetchLatestCommit(sort string, info string) string {
 	if sort == "branch" {
+		fmt.Println("fetch latest commit branch")
 		success, result := excute("git branch -r -v", false)
+		fmt.Println("fetch latest commit result : " + result)
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
