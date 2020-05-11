@@ -105,7 +105,7 @@ func merge(target string, from string) {
 	branch, err := search(from)
 	if err == nil {
 		excute("git", "checkout", "-f")
-		excute("git", "checkout", "-B", branch, "remote/"+branch)
+		excute("git", "checkout", "-B", strings.Replace(branch, "origin/", "", -1), branch)
 		excute("git", "pull")
 		excute("git", "checkout", target)
 		excute("git", "pull")
