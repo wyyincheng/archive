@@ -110,6 +110,7 @@ func merge(target string, from string) {
 		excute("git checkout " + target)
 		excute("git pull")
 		excute("git merge --no-ff " + branch)
+        
 	}
 }
 
