@@ -118,6 +118,7 @@ func archive(target string, version string) {
 
 	*/
 	checkCMD("git")
+	excute("cd /Users/yc/Develop/Golang/GoShell/archive/gitdemo", false)
 	archiveInfo.User = gitConfig("user.name")
 	archiveInfo.Email = gitConfig("user.email")
 	merge(target, version)
