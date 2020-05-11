@@ -104,8 +104,12 @@ func merge(target string, from string) {
 	4.记录并merge
 	5.同步
 	*/
-	excute("git", "checkout", "-f")
+	// excute("git", "checkout", "-f")
+	excute("git", "checkout", from)
+	excute("git", "pull")
 	excute("git", "checkout", target)
+	excute("git", "pull")
+	excute("git", "merge", from)
 }
 
 func abort() {
