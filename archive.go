@@ -191,6 +191,7 @@ func fetchLatestCommit(sort string, info string) string {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
 				trimStr := strings.Trim(commit, " ")
+				fmt.Println("fetch latest commit trimStr : " + trimStr)
 				if strings.HasPrefix(trimStr, info+" ") {
 					infos := strings.Replace(trimStr, info+" ", "", 1)
 					return strings.Split(infos, " ")[0]
