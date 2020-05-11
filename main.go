@@ -38,19 +38,37 @@ func buildCLI() {
 	app.Name = "archive"
 	app.Usage = "archive appstore latest version which has been published."
 	app.Action = func(c *cli.Context) error {
-		fmt.Println("start archive")
-		archive(os.Args[1])
+		// fmt.Println("start archive")
+		// fmt.Println("into:", c.String("into"))
+		// fmt.Println("version:", c.String("v"))
+		// fmt.Println("branch", c.String("b"))
+		target := c.String("into")
+		version := c.String("v")
+		archive(target, version)
 		return nil
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:  "project,p",
-			Value: "niuwa-ios",
-			Usage: "Project you will archive.",
+			Name:    "project",
+			Aliases: []string{"p"},
+			Value:   "niuwa-ios",
+			Usage:   "Project you will archive.",
 		},
 		&cli.StringFlag{
-			Name:  "version,v",
-			Usage: "project version you will archive.",
+			Name:    "into",
+			Value:   "master",
+			Aliases: []string{"i"},
+			Usage:   "archive version code into which branch.",
+		},
+		&cli.StringFlag{
+			Name:    "version",
+			Aliases: []string{"v"},
+			Usage:   "project version you will archive.",
+		},
+		&cli.StringFlag{
+			Name:    "branch",
+			Aliases: []string{"b"},
+			Usage:   "project branch you will archive.",
 		},
 	}
 	app.Commands = []*cli.Command{
@@ -91,7 +109,7 @@ func buildCLI() {
 
 }
 
-func archive(version string) {
+func archive(target string, version string) {
 	/**
 	1.检测命令
 	2.同步代码
