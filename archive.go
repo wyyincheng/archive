@@ -44,7 +44,7 @@ func buildCLI() {
 		// fmt.Println("branch", c.String("b"))
 		target := c.String("into")
 		version := c.String("v")
-		archive(target, version)
+		test(target, version)
 		return nil
 	}
 	app.Flags = []cli.Flag{
@@ -275,6 +275,14 @@ func test(target string, version string) {
 	_, branch := search(version)
 	commit := fetchLatestCommit("branch", branch)
 	fmt.Println("commit: " + commit)
+	archiveInfo.branches = []Branch{
+		{
+			Name:   branch,
+			Commit: commit,
+		},
+	}
+	fmt.Println(archiveInfo)
+	write(archiveInfo)
 }
 
 //Archive 归档信息
