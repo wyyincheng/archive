@@ -2,72 +2,31 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v2"
 )
 
+var app = cli.NewApp()
+
+var archiveInfo = Archive{
+	CLI:     app.Version,
+	Version: "v9.7.0",
+	Time:    time.Now().Unix(),
+	Status:  0,
+}
+
 func main() {
 
-	app := &cli.App{
-		Name:  "archive",
-		Usage: "archive appstore latest version which has been published.",
-		Action: func(c *cli.Context) error {
-			fmt.Println("start archive")
-			archive(os.Args[1])
-			return nil
-		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "project,p",
-				Value: "niuwa-ios",
-				Usage: "Project you will archive.",
-			},
-			&cli.StringFlag{
-				Name:  "version,v",
-				Usage: "project version you will archive.",
-			},
-		},
-		Commands: []*cli.Command{
-			{
-				Name:  "lock",
-				Usage: "lock tag or branch",
-				Action: func(c *cli.Context) error {
-					fmt.Println("lock tag or branch")
-					return nil
-				},
-			},
-			{
-				Name:  "clean",
-				Usage: "clean tags and branches after archive",
-				Action: func(c *cli.Context) error {
-					return nil
-				},
-			},
-			{
-				Name:  "abort",
-				Usage: "rollback archive which version you given",
-				Action: func(c *cli.Context) error {
-					return nil
-				},
-			},
-			{
-				Name:  "test",
-				Usage: "test cmd",
-				Action: func(c *cli.Context) error {
-					test()
-					return nil
-				},
-			},
-		},
-	}
-
-	// sort.Sort(cli.FlagsByName(app.Flags))
-	// sort.Sort(cli.CommandsByName(app.Commands))
+	buildCLI()
 
 	err := app.Run(os.Args)
 	if err != nil {
@@ -75,7 +34,82 @@ func main() {
 	}
 }
 
-func archive(version string) {
+func buildCLI() {
+	app.Name = "archive"
+	app.Usage = "archive appstore latest version which has been published."
+	app.Action = func(c *cli.Context) error {
+		// fmt.Println("start archive")
+		// fmt.Println("into:", c.String("into"))
+		// fmt.Println("version:", c.String("v"))
+		// fmt.Println("branch", c.String("b"))
+		target := c.String("into")
+		version := c.String("v")
+		archive(target, version)
+		return nil
+	}
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:    "project",
+			Aliases: []string{"p"},
+			Value:   "niuwa-ios",
+			Usage:   "Project you will archive.",
+		},
+		&cli.StringFlag{
+			Name:    "into",
+			Value:   "master",
+			Aliases: []string{"i"},
+			Usage:   "archive version code into which branch.",
+		},
+		&cli.StringFlag{
+			Name:    "version",
+			Aliases: []string{"v"},
+			Usage:   "project version you will archive.",
+		},
+		&cli.StringFlag{
+			Name:    "branch",
+			Aliases: []string{"b"},
+			Usage:   "project branch you will archive.",
+		},
+	}
+	app.Commands = []*cli.Command{
+		{
+			Name:  "lock",
+			Usage: "lock tag or branch",
+			Action: func(c *cli.Context) error {
+				fmt.Println("lock tag or branch")
+				return nil
+			},
+		},
+		{
+			Name:  "clean",
+			Usage: "clean tags and branches after archive",
+			Action: func(c *cli.Context) error {
+				return nil
+			},
+		},
+		{
+			Name:  "abort",
+			Usage: "rollback archive which version you given",
+			Action: func(c *cli.Context) error {
+				return nil
+			},
+		},
+		{
+			Name:  "test",
+			Usage: "test cmd",
+			Action: func(c *cli.Context) error {
+				test()
+				return nil
+			},
+		},
+	}
+
+	// sort.Sort(cli.FlagsByName(app.Flags))
+	// sort.Sort(cli.CommandsByName(app.Commands))
+
+}
+
+func archive(target string, version string) {
 	/**
 	1.检测命令
 	2.同步代码
@@ -84,19 +118,12 @@ func archive(version string) {
 
 	*/
 	checkCMD("git")
-	sync()
-	merge("develop", version)
+	archiveInfo.User = gitConfig("user.name")
+	archiveInfo.Email = gitConfig("user.email")
+	merge(target, version)
 }
 
-func sync() {
-	success, fetchResult := excute("git fetch")
-	if success {
-
-		println(fetchResult)
-	}
-}
-
-func merge(target string, from string) {
+func merge(target string, version string) {
 	/**
 	1.分支检测，target、from
 	2.分支切换 target
@@ -104,28 +131,40 @@ func merge(target string, from string) {
 	4.记录并merge
 	5.同步
 	*/
-	success, branch := search(from)
+	success, branch := search(version)
 	if success {
-		excute("git checkout -f")
-		excute("git checkout " + target)
-		excute("git pull")
-		beforCommit1 := backup("branch", branch)
-		beforCommit2 := backup("branch", "master")
-		mergeSuccess, _ := excute("git merge --no-ff " + branch)
-		afterCommit3 := backup("branch", branch)
-		afterCommit4 := backup("branch", "master")
+
+		archiveInfo.Version = version
+		archiveInfo.Branch = branch
+		// -f use checkout -f
+		// ohter checkout "Your branch is up to date"
+
+		excute("git checkout -f", false)
+		excute("git fetch", false)
+		excute("git checkout "+target, false)
+		excute("git pull", false)
+		archiveInfo.Commit = fetchLatestCommit("branch", target)
+		branchInfo := Branch{
+			Name:   branch,
+			Commit: fetchLatestCommit("branch", branch),
+		}
+		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
-			excute("git push")
+			excute("git push", false)
+			fmt.Println(branchInfo)
+			fmt.Println(fetchLatestCommit("branch", branch))
+			// archiveInfo.branches = []Branch{
+			// 	&branchInfo
+			// }
 		} else {
 			print("auto merge faulure. ")
-			// abort(mergeResult)
+			abort("merge", "")
 		}
-		fmt.Printf("merge result: '%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
 	}
 }
 
 func search(branch string) (bool, string) {
-	success, searchResult := excute("git branch -r")
+	success, searchResult := excute("git branch -r", false)
 	if success == false {
 		return false, ""
 	}
@@ -141,14 +180,21 @@ func search(branch string) (bool, string) {
 	return false, ""
 }
 
-func backup(sort string, info string) string {
+func gitConfig(key string) string {
+	_, config := excute("git config --get "+key, false)
+	return config
+}
+
+func fetchLatestCommit(sort string, info string) string {
 	if sort == "branch" {
-		success, result := excute("git show --decorate-refs " + info)
+		success, result := excute("git branch -r -v", false)
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
-				if strings.HasPrefix(commit, "commit ") {
-					return strings.Replace(commit, "commit ", "", -1)
+				trimStr := strings.Trim(commit, " ")
+				if strings.HasPrefix(trimStr, info+" ") {
+					infos := strings.Replace(trimStr, info+" ", "", 1)
+					return strings.Split(infos, " ")[0]
 				}
 			}
 		}
@@ -158,8 +204,14 @@ func backup(sort string, info string) string {
 	return ""
 }
 
-func abort() {
+func abort(action string, commit string) {
+	if action == "branch" {
 
+	} else if action == "tag" {
+
+	} else if action == "merge" {
+		excute("git merge --abort", false)
+	}
 }
 
 func clean() {
@@ -181,7 +233,7 @@ func checkCMD(cmd string) {
 	}
 }
 
-func excute(cmdStr string) (bool, string) {
+func excute(cmdStr string, silent bool) (bool, string) {
 	fmt.Printf("cmd run: '%s'\n", cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
@@ -193,8 +245,10 @@ func excute(cmdStr string) (bool, string) {
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
 		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
-		log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
-		// os.Exit(600)
+		if silent == false {
+			//静默处理：正常返回处理结果，不结束程序
+			log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
+		}
 		return false, errStr
 	}
 	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
@@ -202,16 +256,56 @@ func excute(cmdStr string) (bool, string) {
 	return true, outStr
 }
 
-func test() {
-	// cmd := exec.Command("git", "clone", "https://github.com/windzhu0514/cmd", "/Users/yc/Develop/Golang/GoShell/archive")
-	cmd := exec.Command("git", "fetch")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalf("cmd.Run() failed with %s\n", err)
+func write(info Archive) {
+	infoJSON, _ := json.Marshal(info)
+	if infoJSON != nil {
+		pwd, _ := os.Getwd()
+		filePath := path.Join(pwd, "backup")
+		os.MkdirAll(filePath, os.ModePerm)
+		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
 	}
-	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
-	fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
+}
+
+func test() {
+	info := Archive{
+		CLI:     "1.0.0",
+		Version: "v9.7.0",
+		User:    "yc",
+		Time:    time.Now().Unix(),
+		Status:  0,
+	}
+
+	infoJSON, _ := json.Marshal(info)
+	if infoJSON != nil {
+		pwd, _ := os.Getwd()
+		filePath := path.Join(pwd, "backup")
+		os.MkdirAll(filePath, os.ModePerm)
+		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
+	}
+}
+
+//Archive 归档信息
+type Archive struct {
+	CLI      string
+	Version  string
+	Branch   string
+	Commit   string
+	User     string
+	Email    string
+	branches []Branch
+	tags     []Tag
+	Time     int64
+	Status   int //0 默认状态，1 已还原，必要时可被删除
+}
+
+//Branch 分支信息
+type Branch struct {
+	Name   string
+	Commit string
+}
+
+//Tag tag信息
+type Tag struct {
+	Name   string
+	Commit string
 }
