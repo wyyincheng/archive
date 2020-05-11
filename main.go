@@ -17,7 +17,7 @@ func main() {
 		Usage: "archive appstore latest version which has been published.",
 		Action: func(c *cli.Context) error {
 			fmt.Println("start archive")
-			archive()
+			archive(os.Args[0])
 			return nil
 		},
 		Flags: []cli.Flag{
@@ -78,7 +78,7 @@ func main() {
 	}
 }
 
-func archive() {
+func archive(version string) {
 	/**
 	1.检测命令
 	2.同步代码
@@ -88,7 +88,7 @@ func archive() {
 	*/
 	checkCMD("git")
 	sync()
-	merge()
+	merge("master", version)
 }
 
 func sync() {
@@ -105,6 +105,7 @@ func merge(target string, from string) {
 	5.同步
 	*/
 	excute("git", "checkout", "-f")
+	excute("git", "checkout", target)
 }
 
 func abort() {
