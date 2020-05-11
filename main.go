@@ -119,7 +119,7 @@ func merge(target string, from string) {
 			print("auto merge faulure.")
 			// abort(mergeResult)
 		}
-		fmt.Printf("'%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
+		fmt.Printf("merge result: '%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
 	}
 }
 
