@@ -113,18 +113,13 @@ func merge(target string, from string) {
 		excute("git checkout -f")
 		excute("git checkout " + target)
 		excute("git pull")
-		beforCommit1 := backup("branch", branch)
-		beforCommit2 := backup("branch", "master")
 		mergeSuccess, _ := excute("git merge --no-ff " + branch)
-		afterCommit3 := backup("branch", branch)
-		afterCommit4 := backup("branch", "master")
 		if mergeSuccess {
 			excute("git push")
 		} else {
 			print("auto merge faulure. ")
 			// abort(mergeResult)
 		}
-		fmt.Printf("merge result: '%s'\n'%s'\n'%s'\n'%s'\n", beforCommit1, beforCommit2, afterCommit3, afterCommit4)
 	}
 }
 
