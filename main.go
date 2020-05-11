@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/urfave/cli/v2"
 )
@@ -203,16 +207,53 @@ func excute(cmdStr string) (bool, string) {
 	return true, outStr
 }
 
-func test() {
-	// cmd := exec.Command("git", "clone", "https://github.com/windzhu0514/cmd", "/Users/yc/Develop/Golang/GoShell/archive")
-	cmd := exec.Command("git", "fetch")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalf("cmd.Run() failed with %s\n", err)
+func write(info Archive) {
+	infoJSON, _ := json.Marshal(info)
+	if infoJSON != nil {
+		pwd, _ := os.Getwd()
+		filePath := path.Join(pwd, "backup")
+		os.MkdirAll(filePath, os.ModePerm)
+		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
 	}
-	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
-	fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
+}
+
+func test() {
+	info := Archive{
+		Env:     "1.0.0",
+		Version: "v9.7.0",
+		User:    "yc",
+		Time:    time.Now().Unix(),
+		Status:  0,
+	}
+
+	infoJSON, _ := json.Marshal(info)
+	if infoJSON != nil {
+		pwd, _ := os.Getwd()
+		filePath := path.Join(pwd, "backup")
+		os.MkdirAll(filePath, os.ModePerm)
+		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
+	}
+}
+
+//Archive 归档信息
+type Archive struct {
+	Env      string
+	Version  string
+	User     string
+	branches []Branch
+	tags     []Tag
+	Time     int64
+	Status   int //0 默认状态，1 已还原，必要时可被删除
+}
+
+//Branch 分支信息
+type Branch struct {
+	Name   string
+	Commit string
+}
+
+//Tag tag信息
+type Tag struct {
+	Name   string
+	Commit string
 }

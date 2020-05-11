@@ -11,7 +11,7 @@
             "mode": "auto",
             "program": "/Users/yc/Develop/Golang/GoShell/archive/main.go",
             "env": {},
-            "args": ["develop"]
+            "args": ["test"]
         }
     ]
 }
