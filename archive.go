@@ -181,7 +181,7 @@ func buildCLI() {
 }
 
 func buildLogger() {
-	logPath = path.Join(config.WorkSpace, "Logs", localTime()+".log")
+	logPath = path.Join(config.WorkSpace, "Logs", string(time.Now().Unix())+".log")
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
@@ -493,7 +493,7 @@ func test(target string, version string) {
 	// if err != nil {
 	// 	fmt.Println(err)
 	// }
-	fmt.Println(time.Now().String())
+	fmt.Println(time.Now().Unix())
 }
 
 // String value for traking
