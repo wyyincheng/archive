@@ -24,16 +24,17 @@ var (
 		Time:   time.Now().Unix(),
 		Status: 0,
 	}
+	logger *log.Logger
 )
 
 func main() {
-
 	loadConfig()
+	buildLogger()
 	buildCLI()
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
 
@@ -175,6 +176,23 @@ func buildCLI() {
 	// sort.Sort(cli.FlagsByName(app.Flags))
 	// sort.Sort(cli.CommandsByName(app.Commands))
 
+}
+
+func buildLogger() {
+	logPath := path.Join(config.WorkSpace, "Logs", time.Now().UTC().Local().String()+".log")
+	dirPath := path.Dir(logPath)
+	mkErr := os.MkdirAll(dirPath, os.ModePerm)
+	if mkErr != nil {
+		fmt.Printf("mkdir log folder err : '%s'", mkErr)
+		return
+	}
+	logfile, err := os.Create(logPath)
+	if err != nil {
+		fmt.Printf("create log file err : '%s'", mkErr)
+		return
+	}
+
+	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
 }
 
 func archive(target string, version string) {
@@ -370,13 +388,13 @@ func lock() {
 func checkCMD(cmd string) {
 	_, err := exec.LookPath(cmd)
 	if err != nil {
-		fmt.Printf("didn't find '%s' cmd", cmd)
-		os.Exit(404)
+		logger.Fatal(err)
 	}
 }
 
 func excute(cmdStr string, silent bool) (bool, string) {
 	// fmt.Printf("cmd run: '%s'\n", cmdStr)
+	logger.Println(cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
 	// cmd := exec.Command(name, arg...)
@@ -386,14 +404,14 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	err := cmd.Run()
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
-		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
+		logger.Println(errStr)
 		if silent == false {
 			//静默处理：正常返回处理结果，不结束程序
-			log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
+			log.Fatal(err)
 		}
 		return false, errStr
 	}
-	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
+	logger.Println(outStr)
 	//TODO: log 、 notification
 	return true, outStr
 }
@@ -415,12 +433,12 @@ func write(json []byte, filePath string) {
 		dirPath := path.Dir(filePath)
 		mkErr := os.MkdirAll(dirPath, os.ModePerm)
 		if mkErr != nil {
-			fmt.Printf("mkdir err : '%s'", mkErr)
+			logger.Fatal(mkErr)
 			return
 		}
 		writeErr := ioutil.WriteFile(filePath, json, os.ModePerm)
 		if writeErr != nil {
-			fmt.Printf("write err : '%s'", writeErr)
+			logger.Fatal(writeErr)
 			return
 		}
 	}
@@ -438,20 +456,23 @@ func loadConfig() {
 	_, err := os.Stat(configFile)
 	if os.IsNotExist(err) {
 		//初始化
+		logger.Println("'%s' no exist.")
 		config.WorkSpace = configPath
 		saveConfig(config)
-		fmt.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
+		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
 		return
 	}
 
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		//Log load config failure
+		logger.Fatal(err)
 	}
 	var localConfig Config
 	err = json.Unmarshal(data, &localConfig)
 	if err != nil {
 		//Log load config failure
+		logger.Fatal(err)
 	}
 	config = localConfig
 }
