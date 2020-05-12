@@ -24,7 +24,9 @@ var (
 		Time:   time.Now().Unix(),
 		Status: 0,
 	}
-	logger *log.Logger
+	archivePath string
+	logger      *log.Logger
+	logPath     string
 )
 
 func main() {
@@ -179,7 +181,7 @@ func buildCLI() {
 }
 
 func buildLogger() {
-	logPath := path.Join(config.WorkSpace, "Logs", time.Now().UTC().Local().String()+".log")
+	logPath = path.Join(config.WorkSpace, "Logs", time.Now().UTC().Local().String()+".log")
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
@@ -196,6 +198,7 @@ func buildLogger() {
 }
 
 func archive(target string, version string) {
+
 	/**
 	1.检测命令
 	2.同步代码
@@ -209,8 +212,13 @@ func archive(target string, version string) {
 	archiveInfo.Email = gitConfig("user.email")
 	success := merge(target, version)
 	if success {
+		archiveInfo.Log = logPath
 		cleanBranch(All)
+		saveArchive(archiveInfo)
+		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'", version, target, logPath, archivePath)
+		return
 	}
+	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'", version, target, logPath, archivePath)
 }
 
 func checkVersion(version string) (bool, string, string) {
@@ -370,8 +378,6 @@ func cleanBranch(traking Tracking) {
 		})
 	}
 	archiveInfo.branches = branches
-	fmt.Println(archiveInfo)
-	fmt.Println("cleanBranch")
 }
 
 func lock() {
@@ -414,8 +420,8 @@ func excute(cmdStr string, silent bool) (bool, string) {
 
 func saveArchive(info Archive) {
 	infoJSON, _ := json.Marshal(info)
-	filePath := path.Join(config.WorkSpace, "backup", info.Version+".json")
-	write(infoJSON, filePath)
+	archivePath = path.Join(config.WorkSpace, "backup", info.Version+".json")
+	write(infoJSON, archivePath)
 }
 
 func saveConfig(config Config) {
@@ -514,6 +520,7 @@ type Archive struct {
 	tags     []Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
+	Log      string
 }
 
 //Branch 分支信息
