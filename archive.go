@@ -15,17 +15,20 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var app = cli.NewApp()
-
-var config = Config{}
-var archiveInfo = Archive{
-	CLI:    app.Version,
-	Time:   time.Now().Unix(),
-	Status: 0,
-}
+var (
+	configPath  = "/usr/local/share/YCLI/Archive"
+	app         = cli.NewApp()
+	config      = Config{}
+	archiveInfo = Archive{
+		CLI:    app.Version,
+		Time:   time.Now().Unix(),
+		Status: 0,
+	}
+)
 
 func main() {
 
+	loadConfig()
 	buildCLI()
 
 	err := app.Run(os.Args)
@@ -131,6 +134,30 @@ func buildCLI() {
 			Usage: "rollback archive which version you given",
 			Action: func(c *cli.Context) error {
 				return nil
+			},
+		},
+		{
+			Name:  "config",
+			Usage: "setting archive config",
+			Action: func(c *cli.Context) error {
+				key := c.String("get")
+				value := getConfig(key)
+				fmt.Printf("Archive Config ('%s' : '%s')", key, value)
+				return nil
+			},
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "get",
+					Usage: "Get config value for the key.",
+				},
+				&cli.StringFlag{
+					Name:  "get-all",
+					Usage: "Get all config value.",
+				},
+				&cli.StringFlag{
+					Name:  "add",
+					Usage: "Add config key and value.",
+				},
 			},
 		},
 		{
@@ -377,19 +404,63 @@ func saveArchive(info Archive) {
 	write(infoJSON, filePath)
 }
 
+func saveConfig(config Config) {
+	infoJSON, _ := json.Marshal(config)
+	filePath := path.Join(config.WorkSpace, "Config.json")
+	write(infoJSON, filePath)
+}
+
 func write(json []byte, filePath string) {
 	if json != nil {
-		os.MkdirAll(filePath, os.ModePerm)
-		ioutil.WriteFile(filePath, json, os.ModePerm)
+		dirPath := path.Dir(filePath)
+		mkErr := os.MkdirAll(dirPath, os.ModePerm)
+		if mkErr != nil {
+			fmt.Printf("mkdir err : '%s'", mkErr)
+			return
+		}
+		writeErr := ioutil.WriteFile(filePath, json, os.ModePerm)
+		if writeErr != nil {
+			fmt.Printf("write err : '%s'", writeErr)
+			return
+		}
 	}
 }
 
-func readConfig() {
+func getConfig(key string) string {
+	loadConfig()
+	return config.WorkSpace
+}
 
+func loadConfig() {
+
+	//checkFile
+	configFile := path.Join(configPath, "Config.json")
+	_, err := os.Stat(configFile)
+	if os.IsNotExist(err) {
+		//初始化
+		config.WorkSpace = configPath
+		saveConfig(config)
+		fmt.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
+		return
+	}
+
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		//Log load config failure
+	}
+	var localConfig Config
+	err = json.Unmarshal(data, &localConfig)
+	if err != nil {
+		//Log load config failure
+	}
+	config = localConfig
 }
 
 func test(target string, version string) {
-	cleanBranch(All)
+	// cleanBranch(All)
+	key := "WorkSpace"
+	value := getConfig(key)
+	fmt.Printf("Archive Config ('%s' : '%s')", key, value)
 }
 
 //Config 配置信息
