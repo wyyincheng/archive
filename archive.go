@@ -87,6 +87,44 @@ func buildCLI() {
 
 				return nil
 			},
+			Subcommands: []*cli.Command{
+				{
+					Name:  "branch",
+					Usage: "clean branches which been merged",
+					Action: func(c *cli.Context) error {
+
+						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "all",
+							Aliases: []string{"a"},
+							Value:   true,
+							Usage:   "clean all branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "remote",
+							Aliases: []string{"r"},
+							Value:   true,
+							Usage:   "clean remote branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "local",
+							Aliases: []string{"l"},
+							Value:   true,
+							Usage:   "clean local branches which been merged",
+						},
+					},
+				},
+				{
+					Name:  "tag",
+					Usage: "clean tag which out of range rule",
+					Action: func(c *cli.Context) error {
+
+						return nil
+					},
+				},
+			},
 		},
 		{
 			Name:  "abort",
@@ -166,8 +204,10 @@ func merge(target string, version string) bool {
 			excute("git push", false)
 			archiveInfo.branches = []Branch{
 				{
-					Name:   branch,
-					Commit: fetchLatestCommit("branch", branch, Remote),
+					Name:     branch,
+					Tracking: Remote,
+					State:    Merged,
+					Commit:   fetchLatestCommit("branch", branch, Remote),
 				},
 			}
 			saveArchive(archiveInfo)
@@ -221,7 +261,7 @@ func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
-				trimStr := strings.Trim(commit, " ")
+				trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
 				fmt.Println("fetch latest commit trimStr : " + trimStr)
 				fmt.Println("fetch latest commit info : " + trimStr)
 				if strings.HasPrefix(trimStr, info) {
@@ -252,14 +292,15 @@ func abort(action string, commit string) {
 func cleanBranch(traking Tracking) {
 	//指定分支，所有分支，本地分支，远程分支
 
-	excute("git checkout -f", false)
-	excute("git checkout master", false)
+	// excute("git checkout -f", false)
+	// excute("git checkout master", false)
 
 	var result string
 
 	if traking == All {
 		cleanBranch(Local)
 		cleanBranch(Remote)
+		return
 	} else if traking == Local {
 		_, resp := excute("git branch --merged", false)
 		result = resp
@@ -269,19 +310,27 @@ func cleanBranch(traking Tracking) {
 	}
 
 	resultArray := strings.Split(result, "\n")
-	branches := []Branch{}
+	branches := archiveInfo.branches
 	for _, info := range resultArray {
 		trimStr := strings.Trim(info, " ")
 		branchInfo := strings.Replace(trimStr, "*", "", -1)
 		branch := strings.Trim(branchInfo, " ")
+		if branch == "master" || branch == "origin/master" || len(branch) == 0 {
+			continue
+		}
+		// if config.DefaultBranch.contains(branch) {
+		// continue
+		// }
 		branches = append(branches, Branch{
-			Name:   branch,
-			Commit: fetchLatestCommit("branch", branch, traking),
+			Name:     branch,
+			Tracking: traking,
+			State:    Delete,
+			Commit:   fetchLatestCommit("branch", branch, traking),
 		})
 	}
 	archiveInfo.branches = branches
-	fmt.Println("cleanBranch")
 	fmt.Println(archiveInfo)
+	fmt.Println("cleanBranch")
 }
 
 func lock() {
@@ -345,9 +394,10 @@ func test(target string, version string) {
 
 //Config 配置信息
 type Config struct {
-	Name      string
-	Email     string
-	WorkSpace string
+	Name          string
+	Email         string
+	WorkSpace     string
+	DefaultBranch []string
 }
 
 //Archive 归档信息
@@ -366,8 +416,10 @@ type Archive struct {
 
 //Branch 分支信息
 type Branch struct {
-	Name   string
-	Commit string
+	Name     string
+	Commit   string
+	Tracking Tracking
+	State    State
 }
 
 //Tag tag信息
@@ -384,4 +436,14 @@ const (
 	All Tracking = iota
 	Local
 	Remote
+)
+
+// Branch state
+type State int
+
+// 分支状态
+const (
+	Merged State = iota
+	Delete
+	Abort
 )
