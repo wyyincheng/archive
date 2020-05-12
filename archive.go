@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,7 +182,7 @@ func buildCLI() {
 }
 
 func buildLogger() {
-	logPath = path.Join(config.WorkSpace, "Logs", string(time.Now().Unix())+".log")
+	logPath = path.Join(config.WorkSpace, "Logs", strconv.FormatInt(time.Now().Unix(), 10)+".log")
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
@@ -489,11 +490,7 @@ func localTime() string {
 }
 
 func test(target string, version string) {
-	// local, err := time.LoadLocation("Local")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	fmt.Println(time.Now().Unix())
+	fmt.Println(strconv.FormatInt(time.Now().Unix(), 10) + ".log")
 }
 
 // String value for traking
