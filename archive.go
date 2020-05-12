@@ -185,12 +185,12 @@ func buildLogger() {
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
-		fmt.Printf("mkdir log folder err : '%s'", mkErr)
+		fmt.Printf("mkdir log folder err : '%s'\n", mkErr)
 		return
 	}
 	logfile, err := os.Create(logPath)
 	if err != nil {
-		fmt.Printf("create log file err : '%s'", mkErr)
+		fmt.Printf("create log file err : '%s'\n", mkErr)
 		return
 	}
 
@@ -215,10 +215,10 @@ func archive(target string, version string) {
 		archiveInfo.Log = logPath
 		cleanBranch(All)
 		saveArchive(archiveInfo)
-		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'", version, target, logPath, archivePath)
+		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
 		return
 	}
-	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'", version, target, logPath, archivePath)
+	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
 }
 
 func checkVersion(version string) (bool, string, string) {
@@ -458,7 +458,7 @@ func loadConfig() {
 	_, err := os.Stat(configFile)
 	if os.IsNotExist(err) {
 		//初始化
-		logger.Printf("'%s' no exist.", configFile)
+		logger.Printf("'%s' no exist.\n", configFile)
 		config.WorkSpace = configPath
 		saveConfig(config)
 		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
