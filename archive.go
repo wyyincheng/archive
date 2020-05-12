@@ -17,6 +17,7 @@ import (
 
 var app = cli.NewApp()
 
+var config = Config{}
 var archiveInfo = Archive{
 	CLI:     app.Version,
 	Version: "v9.7.0",
@@ -155,7 +156,7 @@ func merge(target string, version string) {
 					Commit: fetchLatestCommit("branch", branch),
 				},
 			}
-			write(archiveInfo)
+			saveArchive(archiveInfo)
 		} else {
 			abort("merge", "")
 		}
@@ -261,14 +262,21 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	return true, outStr
 }
 
-func write(info Archive) {
+func saveArchive(info Archive) {
 	infoJSON, _ := json.Marshal(info)
-	if infoJSON != nil {
-		pwd, _ := os.Getwd()
-		filePath := path.Join(pwd, "backup")
+	filePath := path.Join(config.WorkSpace, "backup", info.Version+".json")
+	write(infoJSON, filePath)
+}
+
+func write(json []byte, filePath string) {
+	if json != nil {
 		os.MkdirAll(filePath, os.ModePerm)
-		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
+		ioutil.WriteFile(filePath, json, os.ModePerm)
 	}
+}
+
+func readConfig() {
+
 }
 
 func test(target string, version string) {
@@ -282,7 +290,14 @@ func test(target string, version string) {
 		},
 	}
 	fmt.Println(archiveInfo)
-	write(archiveInfo)
+	saveArchive(archiveInfo)
+}
+
+//Config 配置信息
+type Config struct {
+	Name      string
+	Email     string
+	WorkSpace string
 }
 
 //Archive 归档信息
