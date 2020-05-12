@@ -20,7 +20,7 @@ var (
 	app         = cli.NewApp()
 	config      = Config{}
 	archiveInfo = Archive{
-		CLI:    app.Version,
+		CLI:    "0.0.1",
 		Time:   time.Now().Unix(),
 		Status: 0,
 	}
@@ -181,7 +181,7 @@ func buildCLI() {
 }
 
 func buildLogger() {
-	logPath = path.Join(config.WorkSpace, "Logs", time.Now().UTC().Local().String()+".log")
+	logPath = path.Join(config.WorkSpace, "Logs", localTime()+".log")
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
@@ -208,8 +208,8 @@ func archive(target string, version string) {
 	*/
 	checkCMD("git")
 	checkVersion(version)
-	archiveInfo.User = gitConfig("user.name")
-	archiveInfo.Email = gitConfig("user.email")
+	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
+	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 	success := merge(target, version)
 	if success {
 		archiveInfo.Log = logPath
@@ -479,11 +479,21 @@ func loadConfig() {
 	config = localConfig
 }
 
+func localTime() string {
+	local, err := time.LoadLocation("Local")
+	if err != nil {
+		logger.Printf("format lcoal time failure: '%s'", err)
+		return time.Now().String()
+	}
+	return time.Now().In(local).Format("202005010-15:04:05")
+}
+
 func test(target string, version string) {
-	// cleanBranch(All)
-	key := "WorkSpace"
-	value := getConfig(key)
-	fmt.Printf("Archive Config ('%s' : '%s')", key, value)
+	// local, err := time.LoadLocation("Local")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	fmt.Println(time.Now().String())
 }
 
 // String value for traking
