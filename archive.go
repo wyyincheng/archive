@@ -287,7 +287,6 @@ func gitConfig(key string) string {
 
 func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 	if sort == "branch" {
-		fmt.Println("fetch latest commit branch: " + info)
 
 		var success bool
 		var result string
@@ -302,17 +301,14 @@ func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 			result = resp
 		}
 
-		fmt.Println("fetch latest commit result : " + result)
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
 				trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
-				fmt.Println("fetch latest commit trimStr : " + trimStr)
-				fmt.Println("fetch latest commit info : " + trimStr)
 				if strings.HasPrefix(trimStr, info) {
-					fmt.Println("fetch latest commit HasPrefix : " + info)
 					infos := strings.Replace(trimStr, info+" ", "", 1)
 					cmt := strings.Split(infos, " ")[0]
+					logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
 					return cmt
 				}
 			}
@@ -320,7 +316,7 @@ func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 	} else if sort == "tag" {
 
 	}
-	fmt.Println("fetch latest commit failure")
+	logger.Printf("'%s' '%s' '%s' fetch latest commit failure \n", sort, info, tracking)
 	return ""
 }
 
@@ -456,7 +452,7 @@ func loadConfig() {
 	_, err := os.Stat(configFile)
 	if os.IsNotExist(err) {
 		//初始化
-		logger.Println("'%s' no exist.")
+		logger.Printf("'%s' no exist.", configFile)
 		config.WorkSpace = configPath
 		saveConfig(config)
 		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
@@ -482,6 +478,20 @@ func test(target string, version string) {
 	key := "WorkSpace"
 	value := getConfig(key)
 	fmt.Printf("Archive Config ('%s' : '%s')", key, value)
+}
+
+// String value for traking
+func String(traking Tracking) string {
+	switch traking {
+	case All:
+		return "All"
+	case Local:
+		return "Local"
+	case Remote:
+		return "Remote"
+	default:
+		return "Unkonw"
+	}
 }
 
 //Config 配置信息
@@ -521,16 +531,16 @@ type Tag struct {
 }
 
 // Tracking type
-type Tracking int
+type Tracking string
 
 // tracking type
 const (
-	All Tracking = iota
-	Local
-	Remote
+	All    Tracking = "All"
+	Local  Tracking = "Local"
+	Remote Tracking = "Remote"
 )
 
-// Branch state
+// State branch state
 type State int
 
 // 分支状态
