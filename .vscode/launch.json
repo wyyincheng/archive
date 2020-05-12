@@ -11,7 +11,8 @@
             "mode": "auto",
             "program": "/Users/yc/Develop/Golang/GoShell/archive/archive.go",
             "env": {},
-            "args": ["-v","auto_merge","-i","develop"]
+            "args": ["test"]
+            // "args": ["-v","auto_merge","-i","develop"]
         }
     ]
 }

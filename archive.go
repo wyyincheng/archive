@@ -84,6 +84,7 @@ func buildCLI() {
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
+
 				return nil
 			},
 		},
@@ -120,12 +121,26 @@ func archive(target string, version string) {
 
 	*/
 	checkCMD("git")
+	checkVersion(version)
 	archiveInfo.User = gitConfig("user.name")
 	archiveInfo.Email = gitConfig("user.email")
-	merge(target, version)
+	success := merge(target, version)
+	if success {
+		cleanBranch(All)
+	}
 }
 
-func merge(target string, version string) {
+func checkVersion(version string) (bool, string, string) {
+	//tag 可用
+	//branch 存在
+
+	var branch, tag string
+	var success bool
+
+	return success, branch, tag
+}
+
+func merge(target string, version string) bool {
 	/**
 	1.分支检测，target、from
 	2.分支切换 target
@@ -145,21 +160,22 @@ func merge(target string, version string) {
 		excute("git fetch", false)
 		excute("git checkout "+target, false)
 		excute("git pull", false)
-		archiveInfo.Commit = fetchLatestCommit("branch", target)
+		archiveInfo.Commit = fetchLatestCommit("branch", target, Local)
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
 			archiveInfo.branches = []Branch{
 				{
 					Name:   branch,
-					Commit: fetchLatestCommit("branch", branch),
+					Commit: fetchLatestCommit("branch", branch, Remote),
 				},
 			}
 			saveArchive(archiveInfo)
-		} else {
-			abort("merge", "")
+			return true
 		}
+		abort("merge", "")
 	}
+	return false
 }
 
 func search(branch string) (bool, string) {
@@ -184,10 +200,23 @@ func gitConfig(key string) string {
 	return config
 }
 
-func fetchLatestCommit(sort string, info string) string {
+func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 	if sort == "branch" {
 		fmt.Println("fetch latest commit branch: " + info)
-		success, result := excute("git branch -r -v", false)
+
+		var success bool
+		var result string
+
+		if tracking == Remote {
+			status, resp := excute("git branch -r -v", false)
+			success = status
+			result = resp
+		} else if tracking == Local {
+			status, resp := excute("git branch -v", false)
+			success = status
+			result = resp
+		}
+
 		fmt.Println("fetch latest commit result : " + result)
 		if success {
 			commitInfos := strings.Split(result, "\n")
@@ -198,7 +227,8 @@ func fetchLatestCommit(sort string, info string) string {
 				if strings.HasPrefix(trimStr, info) {
 					fmt.Println("fetch latest commit HasPrefix : " + info)
 					infos := strings.Replace(trimStr, info+" ", "", 1)
-					return strings.Split(infos, " ")[0]
+					cmt := strings.Split(infos, " ")[0]
+					return cmt
 				}
 			}
 		}
@@ -219,8 +249,39 @@ func abort(action string, commit string) {
 	}
 }
 
-func clean() {
+func cleanBranch(traking Tracking) {
+	//指定分支，所有分支，本地分支，远程分支
 
+	excute("git checkout -f", false)
+	excute("git checkout master", false)
+
+	var result string
+
+	if traking == All {
+		cleanBranch(Local)
+		cleanBranch(Remote)
+	} else if traking == Local {
+		_, resp := excute("git branch --merged", false)
+		result = resp
+	} else if traking == Remote {
+		_, resp := excute("git branch -r --merged", false)
+		result = resp
+	}
+
+	resultArray := strings.Split(result, "\n")
+	branches := []Branch{}
+	for _, info := range resultArray {
+		trimStr := strings.Trim(info, " ")
+		branchInfo := strings.Replace(trimStr, "*", "", -1)
+		branch := strings.Trim(branchInfo, " ")
+		branches = append(branches, Branch{
+			Name:   branch,
+			Commit: fetchLatestCommit("branch", branch, traking),
+		})
+	}
+	archiveInfo.branches = branches
+	fmt.Println("cleanBranch")
+	fmt.Println(archiveInfo)
 }
 
 func lock() {
@@ -279,17 +340,7 @@ func readConfig() {
 }
 
 func test(target string, version string) {
-	_, branch := search(version)
-	commit := fetchLatestCommit("branch", branch)
-	fmt.Println("commit: " + commit)
-	archiveInfo.branches = []Branch{
-		{
-			Name:   branch,
-			Commit: commit,
-		},
-	}
-	fmt.Println(archiveInfo)
-	saveArchive(archiveInfo)
+	cleanBranch(All)
 }
 
 //Config 配置信息
@@ -324,3 +375,13 @@ type Tag struct {
 	Name   string
 	Commit string
 }
+
+// Tracking type
+type Tracking int
+
+// tracking type
+const (
+	All Tracking = iota
+	Local
+	Remote
+)
