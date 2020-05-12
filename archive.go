@@ -19,10 +19,9 @@ var app = cli.NewApp()
 
 var config = Config{}
 var archiveInfo = Archive{
-	CLI:     app.Version,
-	Version: "v9.7.0",
-	Time:    time.Now().Unix(),
-	Status:  0,
+	CLI:    app.Version,
+	Time:   time.Now().Unix(),
+	Status: 0,
 }
 
 func main() {
