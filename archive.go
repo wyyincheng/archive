@@ -47,7 +47,7 @@ func buildCLI() {
 		// fmt.Println("branch", c.String("b"))
 		target := c.String("into")
 		version := c.String("v")
-		test(target, version)
+		archive(target, version)
 		return nil
 	}
 	app.Flags = []cli.Flag{
