@@ -226,6 +226,7 @@ func archive(target string, vtag string) {
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 	success := merge(target, vtag)
 	if success {
+		publishTag(target, vtag)
 		archiveInfo.Log = logPath
 		cleanBranch(All)
 		saveArchive(archiveInfo)
@@ -235,6 +236,17 @@ func archive(target string, vtag string) {
 	}
 	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 	updateVersion()
+}
+
+func publishTag(branch string, vtag string) {
+	excute("git checkout master", false)
+	excute("git tag "+vtag, false)
+	success, _ := excute("git push origin "+vtag, false)
+	if success == false {
+		excute("git tag -d "+vtag, false)
+	}
+	_, info := excute("git show "+vtag, true)
+	logger.Printf("auto publih tag '%s':\n'%s'\n", vtag, info)
 }
 
 func checkVersion(vtag string) (bool, string, string) {
