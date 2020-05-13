@@ -115,7 +115,8 @@ func buildCLI() {
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
-
+				cleanTag(All)
+				cleanBranch(All)
 				return nil
 			},
 			Subcommands: []*cli.Command{
@@ -123,26 +124,37 @@ func buildCLI() {
 					Name:  "branch",
 					Usage: "clean branches which been merged",
 					Action: func(c *cli.Context) error {
-
+						if c.Bool("a") {
+							cleanBranch(All)
+							return nil
+						}
+						if c.Bool("r") {
+							cleanBranch(Remote)
+							return nil
+						}
+						if c.Bool("l") {
+							cleanBranch(Local)
+							return nil
+						}
 						return nil
 					},
 					Flags: []cli.Flag{
 						&cli.BoolFlag{
 							Name:    "all",
 							Aliases: []string{"a"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean all branches which been merged",
 						},
 						&cli.BoolFlag{
 							Name:    "remote",
 							Aliases: []string{"r"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean remote branches which been merged",
 						},
 						&cli.BoolFlag{
 							Name:    "local",
 							Aliases: []string{"l"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean local branches which been merged",
 						},
 					},
@@ -151,8 +163,39 @@ func buildCLI() {
 					Name:  "tag",
 					Usage: "clean tag which out of range rule",
 					Action: func(c *cli.Context) error {
-
+						if c.Bool("a") {
+							cleanTag(All)
+							return nil
+						}
+						if c.Bool("r") {
+							cleanTag(Remote)
+							return nil
+						}
+						if c.Bool("l") {
+							cleanTag(Local)
+							return nil
+						}
 						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "all",
+							Aliases: []string{"a"},
+							Value:   false,
+							Usage:   "clean all branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "remote",
+							Aliases: []string{"r"},
+							Value:   false,
+							Usage:   "clean remote branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "local",
+							Aliases: []string{"l"},
+							Value:   false,
+							Usage:   "clean local branches which been merged",
+						},
 					},
 				},
 			},
@@ -237,8 +280,16 @@ func archive(target string, vtag string) {
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 	success := merge(target, vtag)
 	if success {
+		if checkTagLegal(vtag) == false {
+			saveArchive(archiveInfo)
+			fmt.Printf("Auto merge success, but publish tag(%s) failure. You can use `archive clean` after push tag success.\n", vtag)
+			fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
+			updateVersion()
+			return
+		}
 		publishTag(target, vtag)
 		archiveInfo.Log = logPath
+		cleanTag(All)
 		cleanBranch(All)
 		saveArchive(archiveInfo)
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
@@ -383,6 +434,10 @@ func abort(action string, commit string) {
 	}
 }
 
+func cleanTag(tracking Tracking) {
+
+}
+
 func cleanBranch(traking Tracking) {
 	//指定分支，所有分支，本地分支，远程分支
 
@@ -415,14 +470,32 @@ func cleanBranch(traking Tracking) {
 		// if config.DefaultBranch.contains(branch) {
 		// continue
 		// }
+		var state State
+		if config.BranchClean == Clean {
+			state = Delete
+			deleteBranch(branch, traking)
+		} else {
+			state = Suggest
+		}
+
+		commit := fetchLatestCommit("branch", branch, traking)
 		branches = append(branches, Branch{
 			Name:     branch,
 			Tracking: traking,
-			State:    Delete,
-			Commit:   fetchLatestCommit("branch", branch, traking),
+			State:    state,
+			Commit:   commit,
 		})
+
 	}
 	archiveInfo.branches = branches
+}
+
+func deleteBranch(branch string, traking Tracking) {
+	fmt.Printf("  delete branch(%s %s) : \n", traking, branch)
+}
+
+func deleteTag(tag string, traking Tracking) {
+	fmt.Printf("  delete tag(%s %s) : \n", traking, tag)
 }
 
 func lock() {
@@ -622,6 +695,8 @@ type Config struct {
 	DefaultBranch []string
 	UpdateVersion Frequency
 	LatestCheck   time.Time
+	BranchClean   Suggestion
+	TagClean      Suggestion
 }
 
 //Archive 归档信息
@@ -670,6 +745,7 @@ type State int
 const (
 	Merged State = iota
 	Delete
+	Suggest
 	Abort
 )
 
@@ -681,4 +757,13 @@ const (
 	Day Frequency = iota
 	Week
 	Month
+)
+
+// Suggestion clean suggestion
+type Suggestion int
+
+// 版本更新检测频率
+const (
+	Prompt Suggestion = iota
+	Clean
 )
