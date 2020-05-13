@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,11 +19,11 @@ import (
 )
 
 var (
+	appVersion  = "v0.0.2"
 	configPath  = "/usr/local/share/YCLI/Archive"
 	app         = cli.NewApp()
 	config      = Config{}
 	archiveInfo = Archive{
-		CLI:    "0.0.1",
 		Time:   time.Now().Unix(),
 		Status: 0,
 	}
@@ -45,13 +47,29 @@ func buildCLI() {
 	app.Name = "archive"
 	app.Usage = "archive appstore latest version which has been published."
 	app.Action = func(c *cli.Context) error {
-		// fmt.Println("start archive")
-		// fmt.Println("into:", c.String("into"))
-		// fmt.Println("version:", c.String("v"))
-		// fmt.Println("branch", c.String("b"))
+
+		if c.Bool("V") {
+			fmt.Println(appVersion)
+			return nil
+		}
+
 		target := c.String("into")
-		version := c.String("v")
-		archive(target, version)
+		vtag := c.String("t")
+		if len(vtag) > 0 {
+			if checkTagLegal(vtag) {
+				archive(target, vtag)
+				return nil
+			}
+			fmt.Printf("%s is not legal, check and input like: v1.0.0\n", vtag)
+			return nil
+		}
+
+		if checkTagLegal(c.Args().First()) {
+			archive(target, c.Args().First())
+			return nil
+		}
+
+		fmt.Println("Incorrect Usage. Shoe help :\n  archive -h")
 		return nil
 	}
 	app.Flags = []cli.Flag{
@@ -68,14 +86,20 @@ func buildCLI() {
 			Usage:   "archive version code into which branch.",
 		},
 		&cli.StringFlag{
-			Name:    "version",
-			Aliases: []string{"v"},
-			Usage:   "project version you will archive.",
+			Name:    "tag",
+			Aliases: []string{"t"},
+			Usage:   "project version tag you will archive.",
 		},
 		&cli.StringFlag{
 			Name:    "branch",
 			Aliases: []string{"b"},
 			Usage:   "project branch you will archive.",
+		},
+		&cli.BoolFlag{
+			Name:    "Version",
+			Aliases: []string{"V"},
+			Value:   false,
+			Usage:   "show cli version.",
 		},
 	}
 	app.Commands = []*cli.Command{
@@ -91,7 +115,8 @@ func buildCLI() {
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
-
+				cleanTag(All)
+				cleanBranch(All)
 				return nil
 			},
 			Subcommands: []*cli.Command{
@@ -99,26 +124,37 @@ func buildCLI() {
 					Name:  "branch",
 					Usage: "clean branches which been merged",
 					Action: func(c *cli.Context) error {
-
+						if c.Bool("a") {
+							cleanBranch(All)
+							return nil
+						}
+						if c.Bool("r") {
+							cleanBranch(Remote)
+							return nil
+						}
+						if c.Bool("l") {
+							cleanBranch(Local)
+							return nil
+						}
 						return nil
 					},
 					Flags: []cli.Flag{
 						&cli.BoolFlag{
 							Name:    "all",
 							Aliases: []string{"a"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean all branches which been merged",
 						},
 						&cli.BoolFlag{
 							Name:    "remote",
 							Aliases: []string{"r"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean remote branches which been merged",
 						},
 						&cli.BoolFlag{
 							Name:    "local",
 							Aliases: []string{"l"},
-							Value:   true,
+							Value:   false,
 							Usage:   "clean local branches which been merged",
 						},
 					},
@@ -127,8 +163,39 @@ func buildCLI() {
 					Name:  "tag",
 					Usage: "clean tag which out of range rule",
 					Action: func(c *cli.Context) error {
-
+						if c.Bool("a") {
+							cleanTag(All)
+							return nil
+						}
+						if c.Bool("r") {
+							cleanTag(Remote)
+							return nil
+						}
+						if c.Bool("l") {
+							cleanTag(Local)
+							return nil
+						}
 						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "all",
+							Aliases: []string{"a"},
+							Value:   false,
+							Usage:   "clean all branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "remote",
+							Aliases: []string{"r"},
+							Value:   false,
+							Usage:   "clean remote branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "local",
+							Aliases: []string{"l"},
+							Value:   false,
+							Usage:   "clean local branches which been merged",
+						},
 					},
 				},
 			},
@@ -169,8 +236,8 @@ func buildCLI() {
 			Usage: "test cmd",
 			Action: func(c *cli.Context) error {
 				target := c.String("into")
-				version := c.String("v")
-				test(target, version)
+				vtag := c.String("t")
+				test(target, vtag)
 				return nil
 			},
 		},
@@ -198,7 +265,7 @@ func buildLogger() {
 	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
 }
 
-func archive(target string, version string) {
+func archive(target string, vtag string) {
 
 	/**
 	1.检测命令
@@ -208,21 +275,43 @@ func archive(target string, version string) {
 
 	*/
 	checkCMD("git")
-	checkVersion(version)
+	checkVersion(vtag)
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
-	success := merge(target, version)
+	success := merge(target, vtag)
 	if success {
+		if checkTagLegal(vtag) == false {
+			saveArchive(archiveInfo)
+			fmt.Printf("Auto merge success, but publish tag(%s) failure. You can use `archive clean` after push tag success.\n", vtag)
+			fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
+			updateVersion()
+			return
+		}
+		publishTag(target, vtag)
 		archiveInfo.Log = logPath
+		cleanTag(All)
 		cleanBranch(All)
 		saveArchive(archiveInfo)
-		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
+		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
+		updateVersion()
 		return
 	}
-	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
+	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
+	updateVersion()
 }
 
-func checkVersion(version string) (bool, string, string) {
+func publishTag(branch string, vtag string) {
+	excute("git checkout master", false)
+	excute("git tag "+vtag, false)
+	success, _ := excute("git push origin "+vtag, false)
+	if success == false {
+		excute("git tag -d "+vtag, false)
+	}
+	_, info := excute("git show "+vtag, true)
+	logger.Printf("auto publih tag '%s':\n'%s'\n", vtag, info)
+}
+
+func checkVersion(vtag string) (bool, string, string) {
 	//tag 可用
 	//branch 存在
 
@@ -232,7 +321,13 @@ func checkVersion(version string) (bool, string, string) {
 	return success, branch, tag
 }
 
-func merge(target string, version string) bool {
+func checkTagLegal(vtag string) bool {
+	r := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9])")
+	match := r.MatchString(vtag)
+	return match
+}
+
+func merge(target string, vtag string) bool {
 	/**
 	1.分支检测，target、from
 	2.分支切换 target
@@ -240,10 +335,10 @@ func merge(target string, version string) bool {
 	4.记录并merge
 	5.同步
 	*/
-	success, branch := search(version)
+	success, branch := search(vtag)
 	if success {
 
-		archiveInfo.Version = version
+		archiveInfo.Tag = vtag
 		archiveInfo.Branch = branch
 		// -f use checkout -f
 		// ohter checkout "Your branch is up to date"
@@ -339,6 +434,10 @@ func abort(action string, commit string) {
 	}
 }
 
+func cleanTag(tracking Tracking) {
+
+}
+
 func cleanBranch(traking Tracking) {
 	//指定分支，所有分支，本地分支，远程分支
 
@@ -371,14 +470,32 @@ func cleanBranch(traking Tracking) {
 		// if config.DefaultBranch.contains(branch) {
 		// continue
 		// }
+		var state State
+		if config.BranchClean == Clean {
+			state = Delete
+			deleteBranch(branch, traking)
+		} else {
+			state = Suggest
+		}
+
+		commit := fetchLatestCommit("branch", branch, traking)
 		branches = append(branches, Branch{
 			Name:     branch,
 			Tracking: traking,
-			State:    Delete,
-			Commit:   fetchLatestCommit("branch", branch, traking),
+			State:    state,
+			Commit:   commit,
 		})
+
 	}
 	archiveInfo.branches = branches
+}
+
+func deleteBranch(branch string, traking Tracking) {
+	fmt.Printf("  delete branch(%s %s) : \n", traking, branch)
+}
+
+func deleteTag(tag string, traking Tracking) {
+	fmt.Printf("  delete tag(%s %s) : \n", traking, tag)
 }
 
 func lock() {
@@ -421,7 +538,7 @@ func excute(cmdStr string, silent bool) (bool, string) {
 
 func saveArchive(info Archive) {
 	infoJSON, _ := json.Marshal(info)
-	archivePath = path.Join(config.WorkSpace, "backup", info.Version+".json")
+	archivePath = path.Join(config.WorkSpace, "backup", info.Tag+".json")
 	write(infoJSON, archivePath)
 }
 
@@ -452,8 +569,12 @@ func getConfig(key string) string {
 	return config.WorkSpace
 }
 
-func loadConfig() {
+func updateArchiveInfo() {
+	archiveInfo.ENV = config
+}
 
+func loadConfig() {
+	defer updateArchiveInfo()
 	//checkFile
 	configFile := path.Join(configPath, "Config.json")
 	_, err := os.Stat(configFile)
@@ -461,6 +582,9 @@ func loadConfig() {
 		//初始化
 		logger.Printf("'%s' no exist.\n", configFile)
 		config.WorkSpace = configPath
+		config.LatestCheck = time.Now()
+		config.UpdateVersion = Day
+		config.Version = appVersion
 		saveConfig(config)
 		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
 		return
@@ -489,8 +613,65 @@ func localTime() string {
 	return time.Now().In(local).Format("202005010-15:04:05")
 }
 
-func test(target string, version string) {
-	fmt.Println(strconv.FormatInt(time.Now().Unix(), 10) + ".log")
+func updateVersion() {
+
+	diff := time.Now().Sub(config.LatestCheck).Hours()
+	needCheck := false
+	switch config.UpdateVersion {
+	case Day:
+		needCheck = diff > 24
+	case Week:
+		needCheck = diff > 7*24
+	case Month:
+		needCheck = diff > 30*24
+	default:
+		needCheck = true
+	}
+
+	config.LatestCheck = time.Now()
+	if needCheck == false {
+		return
+	}
+
+	resp, err := http.Get("https://api.github.com/repos/wyyincheng/archive/releases/latest")
+	if err != nil {
+		logger.Printf("check cli version failure(0): '%s'", err)
+	} else {
+		var data map[string]interface{}
+		jsonErr := json.NewDecoder(resp.Body).Decode(&data)
+		if jsonErr != nil {
+			logger.Printf("check cli version failure(1): '%s'", jsonErr)
+			// resp.Body.Close()
+			return
+		}
+
+		needUpdate := false
+		latestList := strings.Split(strings.Replace(data["tag_name"].(string), "v", "", 1), ".")
+		currentList := strings.Split(strings.Replace(appVersion, "v", "", 1), ".")
+		for i := 0; i < len(latestList); i++ {
+			lv, lerr := strconv.Atoi(latestList[i])
+			cv, cerr := strconv.Atoi(currentList[i])
+			if lerr == nil && cerr == nil {
+				if lv > cv {
+					needUpdate = true
+					break
+				}
+			}
+		}
+		if needUpdate {
+			fmt.Println("\n#######################################################################")
+			fmt.Printf("# archive '%s' is available. You are on '%s'.\n", data["tag_name"], appVersion)
+			fmt.Printf("# You should use the latest version.\n")
+			fmt.Printf("# Please update using `brew upgrade wyyincheng/tap/archive`.\n")
+			fmt.Println("#######################################################################")
+		}
+	}
+	// resp.Body.Close()
+}
+
+func test(target string, vtag string) {
+	// updateVersion()
+	checkTagLegal(vtag)
 }
 
 // String value for traking
@@ -509,16 +690,19 @@ func String(traking Tracking) string {
 
 //Config 配置信息
 type Config struct {
-	Name          string
-	Email         string
+	Version       string
 	WorkSpace     string
 	DefaultBranch []string
+	UpdateVersion Frequency
+	LatestCheck   time.Time
+	BranchClean   Suggestion
+	TagClean      Suggestion
 }
 
 //Archive 归档信息
 type Archive struct {
-	CLI      string
-	Version  string
+	ENV      Config
+	Tag      string
 	Branch   string
 	Commit   string
 	User     string
@@ -561,5 +745,25 @@ type State int
 const (
 	Merged State = iota
 	Delete
+	Suggest
 	Abort
+)
+
+// Frequency check update frequency
+type Frequency int
+
+// 版本更新检测频率
+const (
+	Day Frequency = iota
+	Week
+	Month
+)
+
+// Suggestion clean suggestion
+type Suggestion int
+
+// 版本更新检测频率
+const (
+	Prompt Suggestion = iota
+	Clean
 )
