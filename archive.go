@@ -275,7 +275,10 @@ func archive(target string, vtag string) {
 
 	*/
 	checkCMD("git")
-	checkVersion(vtag)
+	if checkTagAvailable(vtag) == false {
+		logger.Fatalf("%s is not available, check and retry.", vtag)
+		return
+	}
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 	success := merge(target, vtag)
@@ -311,14 +314,9 @@ func publishTag(branch string, vtag string) {
 	logger.Printf("auto publih tag '%s':\n'%s'\n", vtag, info)
 }
 
-func checkVersion(vtag string) (bool, string, string) {
-	//tag 可用
-	//branch 存在
-
-	var branch, tag string
-	var success bool
-
-	return success, branch, tag
+func checkTagAvailable(vtag string) bool {
+	_, info := excute("git cat-file -t "+vtag, true)
+	return strings.Contains(info, "fatal: Not a valid object name")
 }
 
 func checkTagLegal(vtag string) bool {
@@ -476,6 +474,7 @@ func cleanBranch(traking Tracking) {
 			deleteBranch(branch, traking)
 		} else {
 			state = Suggest
+			fmt.Printf("  suggest clean branch(%s %s) : \n", traking, branch)
 		}
 
 		commit := fetchLatestCommit("branch", branch, traking)
