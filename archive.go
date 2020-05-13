@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -52,13 +53,23 @@ func buildCLI() {
 			return nil
 		}
 
-		// fmt.Println("start archive")
-		// fmt.Println("into:", c.String("into"))
-		// fmt.Println("version:", c.String("v"))
-		// fmt.Println("branch", c.String("b"))
 		target := c.String("into")
-		tag := c.String("t")
-		archive(target, tag)
+		vtag := c.String("t")
+		if len(vtag) > 0 {
+			if checkTagLegal(vtag) {
+				archive(target, vtag)
+				return nil
+			}
+			fmt.Printf("%s is not legal, check and input like: v1.0.0\n", vtag)
+			return nil
+		}
+
+		if checkTagLegal(c.Args().First()) {
+			archive(target, c.Args().First())
+			return nil
+		}
+
+		fmt.Println("Incorrect Usage. Shoe help :\n  archive -h")
 		return nil
 	}
 	app.Flags = []cli.Flag{
@@ -75,9 +86,9 @@ func buildCLI() {
 			Usage:   "archive version code into which branch.",
 		},
 		&cli.StringFlag{
-			Name:    "version",
-			Aliases: []string{"v"},
-			Usage:   "project version you will archive.",
+			Name:    "tag",
+			Aliases: []string{"t"},
+			Usage:   "project version tag you will archive.",
 		},
 		&cli.StringFlag{
 			Name:    "branch",
@@ -182,8 +193,8 @@ func buildCLI() {
 			Usage: "test cmd",
 			Action: func(c *cli.Context) error {
 				target := c.String("into")
-				version := c.String("v")
-				test(target, version)
+				vtag := c.String("t")
+				test(target, vtag)
 				return nil
 			},
 		},
@@ -257,6 +268,12 @@ func checkVersion(vtag string) (bool, string, string) {
 	var success bool
 
 	return success, branch, tag
+}
+
+func checkTagLegal(vtag string) bool {
+	r := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9])")
+	match := r.MatchString(vtag)
+	return match
 }
 
 func merge(target string, vtag string) bool {
@@ -580,7 +597,8 @@ func updateVersion() {
 }
 
 func test(target string, vtag string) {
-	updateVersion()
+	// updateVersion()
+	checkTagLegal(vtag)
 }
 
 // String value for traking
