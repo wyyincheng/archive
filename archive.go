@@ -276,7 +276,8 @@ func archive(target string, vtag string) {
 	*/
 	checkCMD("git")
 	if checkTagAvailable(vtag) == false {
-		logger.Fatalf("%s is not available, check and retry.", vtag)
+		fmt.Printf("%s is not available, check and retry.\n", vtag)
+		logger.Fatalf("%s is not available, check and retry.\n", vtag)
 		return
 	}
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
