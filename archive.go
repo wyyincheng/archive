@@ -9,28 +9,35 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
 )
 
-var app = cli.NewApp()
-
-var archiveInfo = Archive{
-	CLI:     app.Version,
-	Version: "v9.7.0",
-	Time:    time.Now().Unix(),
-	Status:  0,
-}
+var (
+	configPath  = "/usr/local/share/YCLI/Archive"
+	app         = cli.NewApp()
+	config      = Config{}
+	archiveInfo = Archive{
+		CLI:    "0.0.1",
+		Time:   time.Now().Unix(),
+		Status: 0,
+	}
+	archivePath string
+	logger      *log.Logger
+	logPath     string
+)
 
 func main() {
-
+	loadConfig()
+	buildLogger()
 	buildCLI()
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
 
@@ -84,7 +91,46 @@ func buildCLI() {
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
+
 				return nil
+			},
+			Subcommands: []*cli.Command{
+				{
+					Name:  "branch",
+					Usage: "clean branches which been merged",
+					Action: func(c *cli.Context) error {
+
+						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "all",
+							Aliases: []string{"a"},
+							Value:   true,
+							Usage:   "clean all branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "remote",
+							Aliases: []string{"r"},
+							Value:   true,
+							Usage:   "clean remote branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "local",
+							Aliases: []string{"l"},
+							Value:   true,
+							Usage:   "clean local branches which been merged",
+						},
+					},
+				},
+				{
+					Name:  "tag",
+					Usage: "clean tag which out of range rule",
+					Action: func(c *cli.Context) error {
+
+						return nil
+					},
+				},
 			},
 		},
 		{
@@ -95,10 +141,36 @@ func buildCLI() {
 			},
 		},
 		{
+			Name:  "config",
+			Usage: "setting archive config",
+			Action: func(c *cli.Context) error {
+				key := c.String("get")
+				value := getConfig(key)
+				fmt.Printf("Archive Config ('%s' : '%s')", key, value)
+				return nil
+			},
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "get",
+					Usage: "Get config value for the key.",
+				},
+				&cli.StringFlag{
+					Name:  "get-all",
+					Usage: "Get all config value.",
+				},
+				&cli.StringFlag{
+					Name:  "add",
+					Usage: "Add config key and value.",
+				},
+			},
+		},
+		{
 			Name:  "test",
 			Usage: "test cmd",
 			Action: func(c *cli.Context) error {
-				test()
+				target := c.String("into")
+				version := c.String("v")
+				test(target, version)
 				return nil
 			},
 		},
@@ -109,7 +181,25 @@ func buildCLI() {
 
 }
 
+func buildLogger() {
+	logPath = path.Join(config.WorkSpace, "Logs", strconv.FormatInt(time.Now().Unix(), 10)+".log")
+	dirPath := path.Dir(logPath)
+	mkErr := os.MkdirAll(dirPath, os.ModePerm)
+	if mkErr != nil {
+		fmt.Printf("mkdir log folder err : '%s'\n", mkErr)
+		return
+	}
+	logfile, err := os.Create(logPath)
+	if err != nil {
+		fmt.Printf("create log file err : '%s'\n", mkErr)
+		return
+	}
+
+	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
+}
+
 func archive(target string, version string) {
+
 	/**
 	1.检测命令
 	2.同步代码
@@ -118,12 +208,31 @@ func archive(target string, version string) {
 
 	*/
 	checkCMD("git")
-	archiveInfo.User = gitConfig("user.name")
-	archiveInfo.Email = gitConfig("user.email")
-	merge(target, version)
+	checkVersion(version)
+	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
+	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
+	success := merge(target, version)
+	if success {
+		archiveInfo.Log = logPath
+		cleanBranch(All)
+		saveArchive(archiveInfo)
+		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
+		return
+	}
+	fmt.Printf("Archive '%s' into '%s' failure, see more info on:\nlog: '%s'\ninfo: '%s'\n", version, target, logPath, archivePath)
 }
 
-func merge(target string, version string) {
+func checkVersion(version string) (bool, string, string) {
+	//tag 可用
+	//branch 存在
+
+	var branch, tag string
+	var success bool
+
+	return success, branch, tag
+}
+
+func merge(target string, version string) bool {
 	/**
 	1.分支检测，target、from
 	2.分支切换 target
@@ -143,21 +252,24 @@ func merge(target string, version string) {
 		excute("git fetch", false)
 		excute("git checkout "+target, false)
 		excute("git pull", false)
-		archiveInfo.Commit = fetchLatestCommit("branch", target)
+		archiveInfo.Commit = fetchLatestCommit("branch", target, Local)
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
 			archiveInfo.branches = []Branch{
 				{
-					Name:   branch,
-					Commit: fetchLatestCommit("branch", branch),
+					Name:     branch,
+					Tracking: Remote,
+					State:    Merged,
+					Commit:   fetchLatestCommit("branch", branch, Remote),
 				},
 			}
-			write(archiveInfo)
-		} else {
-			abort("merge", "")
+			saveArchive(archiveInfo)
+			return true
 		}
+		abort("merge", "")
 	}
+	return false
 }
 
 func search(branch string) (bool, string) {
@@ -182,22 +294,38 @@ func gitConfig(key string) string {
 	return config
 }
 
-func fetchLatestCommit(sort string, info string) string {
+func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 	if sort == "branch" {
-		success, result := excute("git branch -r -v", false)
+
+		var success bool
+		var result string
+
+		if tracking == Remote {
+			status, resp := excute("git branch -r -v", false)
+			success = status
+			result = resp
+		} else if tracking == Local {
+			status, resp := excute("git branch -v", false)
+			success = status
+			result = resp
+		}
+
 		if success {
 			commitInfos := strings.Split(result, "\n")
 			for _, commit := range commitInfos {
-				trimStr := strings.Trim(commit, " ")
-				if strings.HasPrefix(trimStr, info+" ") {
+				trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
+				if strings.HasPrefix(trimStr, info) {
 					infos := strings.Replace(trimStr, info+" ", "", 1)
-					return strings.Split(infos, " ")[0]
+					cmt := strings.Split(infos, " ")[0]
+					logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
+					return cmt
 				}
 			}
 		}
 	} else if sort == "tag" {
 
 	}
+	logger.Printf("'%s' '%s' '%s' fetch latest commit failure \n", sort, info, tracking)
 	return ""
 }
 
@@ -211,8 +339,46 @@ func abort(action string, commit string) {
 	}
 }
 
-func clean() {
+func cleanBranch(traking Tracking) {
+	//指定分支，所有分支，本地分支，远程分支
 
+	// excute("git checkout -f", false)
+	// excute("git checkout master", false)
+
+	var result string
+
+	if traking == All {
+		cleanBranch(Local)
+		cleanBranch(Remote)
+		return
+	} else if traking == Local {
+		_, resp := excute("git branch --merged", false)
+		result = resp
+	} else if traking == Remote {
+		_, resp := excute("git branch -r --merged", false)
+		result = resp
+	}
+
+	resultArray := strings.Split(result, "\n")
+	branches := archiveInfo.branches
+	for _, info := range resultArray {
+		trimStr := strings.Trim(info, " ")
+		branchInfo := strings.Replace(trimStr, "*", "", -1)
+		branch := strings.Trim(branchInfo, " ")
+		if branch == "master" || branch == "origin/master" || len(branch) == 0 {
+			continue
+		}
+		// if config.DefaultBranch.contains(branch) {
+		// continue
+		// }
+		branches = append(branches, Branch{
+			Name:     branch,
+			Tracking: traking,
+			State:    Delete,
+			Commit:   fetchLatestCommit("branch", branch, traking),
+		})
+	}
+	archiveInfo.branches = branches
 }
 
 func lock() {
@@ -225,13 +391,13 @@ func lock() {
 func checkCMD(cmd string) {
 	_, err := exec.LookPath(cmd)
 	if err != nil {
-		fmt.Printf("didn't find '%s' cmd", cmd)
-		os.Exit(404)
+		logger.Fatal(err)
 	}
 }
 
 func excute(cmdStr string, silent bool) (bool, string) {
-	fmt.Printf("cmd run: '%s'\n", cmdStr)
+	// fmt.Printf("cmd run: '%s'\n", cmdStr)
+	logger.Println(cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
 	// cmd := exec.Command(name, arg...)
@@ -241,44 +407,112 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	err := cmd.Run()
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
-		fmt.Printf("'%s' failed : '%s'", cmdStr, errStr)
+		logger.Println(errStr)
 		if silent == false {
 			//静默处理：正常返回处理结果，不结束程序
-			log.Fatalf("cmd('%s').Run() failed with %s\n", cmdStr, err)
+			log.Fatal(err)
 		}
 		return false, errStr
 	}
-	// fmt.Printf("out:\n%s\nerr:\n%s\n", outStr, errStr)
+	logger.Println(outStr)
 	//TODO: log 、 notification
 	return true, outStr
 }
 
-func write(info Archive) {
+func saveArchive(info Archive) {
 	infoJSON, _ := json.Marshal(info)
-	if infoJSON != nil {
-		pwd, _ := os.Getwd()
-		filePath := path.Join(pwd, "backup")
-		os.MkdirAll(filePath, os.ModePerm)
-		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
+	archivePath = path.Join(config.WorkSpace, "backup", info.Version+".json")
+	write(infoJSON, archivePath)
+}
+
+func saveConfig(config Config) {
+	infoJSON, _ := json.Marshal(config)
+	filePath := path.Join(config.WorkSpace, "Config.json")
+	write(infoJSON, filePath)
+}
+
+func write(json []byte, filePath string) {
+	if json != nil {
+		dirPath := path.Dir(filePath)
+		mkErr := os.MkdirAll(dirPath, os.ModePerm)
+		if mkErr != nil {
+			logger.Fatal(mkErr)
+			return
+		}
+		writeErr := ioutil.WriteFile(filePath, json, os.ModePerm)
+		if writeErr != nil {
+			logger.Fatal(writeErr)
+			return
+		}
 	}
 }
 
-func test() {
-	info := Archive{
-		CLI:     "1.0.0",
-		Version: "v9.7.0",
-		User:    "yc",
-		Time:    time.Now().Unix(),
-		Status:  0,
+func getConfig(key string) string {
+	loadConfig()
+	return config.WorkSpace
+}
+
+func loadConfig() {
+
+	//checkFile
+	configFile := path.Join(configPath, "Config.json")
+	_, err := os.Stat(configFile)
+	if os.IsNotExist(err) {
+		//初始化
+		logger.Printf("'%s' no exist.\n", configFile)
+		config.WorkSpace = configPath
+		saveConfig(config)
+		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
+		return
 	}
 
-	infoJSON, _ := json.Marshal(info)
-	if infoJSON != nil {
-		pwd, _ := os.Getwd()
-		filePath := path.Join(pwd, "backup")
-		os.MkdirAll(filePath, os.ModePerm)
-		ioutil.WriteFile(path.Join(filePath, info.Version+".json"), infoJSON, os.ModePerm)
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		//Log load config failure
+		logger.Fatal(err)
 	}
+	var localConfig Config
+	err = json.Unmarshal(data, &localConfig)
+	if err != nil {
+		//Log load config failure
+		logger.Fatal(err)
+	}
+	config = localConfig
+}
+
+func localTime() string {
+	local, err := time.LoadLocation("Local")
+	if err != nil {
+		logger.Printf("format lcoal time failure: '%s'", err)
+		return time.Now().String()
+	}
+	return time.Now().In(local).Format("202005010-15:04:05")
+}
+
+func test(target string, version string) {
+	fmt.Println(strconv.FormatInt(time.Now().Unix(), 10) + ".log")
+}
+
+// String value for traking
+func String(traking Tracking) string {
+	switch traking {
+	case All:
+		return "All"
+	case Local:
+		return "Local"
+	case Remote:
+		return "Remote"
+	default:
+		return "Unkonw"
+	}
+}
+
+//Config 配置信息
+type Config struct {
+	Name          string
+	Email         string
+	WorkSpace     string
+	DefaultBranch []string
 }
 
 //Archive 归档信息
@@ -293,12 +527,15 @@ type Archive struct {
 	tags     []Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
+	Log      string
 }
 
 //Branch 分支信息
 type Branch struct {
-	Name   string
-	Commit string
+	Name     string
+	Commit   string
+	Tracking Tracking
+	State    State
 }
 
 //Tag tag信息
@@ -306,3 +543,23 @@ type Tag struct {
 	Name   string
 	Commit string
 }
+
+// Tracking type
+type Tracking string
+
+// tracking type
+const (
+	All    Tracking = "All"
+	Local  Tracking = "Local"
+	Remote Tracking = "Remote"
+)
+
+// State branch state
+type State int
+
+// 分支状态
+const (
+	Merged State = iota
+	Delete
+	Abort
+)

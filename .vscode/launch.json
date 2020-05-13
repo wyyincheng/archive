@@ -9,9 +9,10 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "/Users/yc/Develop/Golang/GoShell/archive/main.go",
+            "program": "/Users/yc/Develop/Golang/GoShell/archive/archive.go",
             "env": {},
-            "args": ["-v","auto_merge","-i","develop"]
+            "args": ["test"]
+            // "args": ["-v","auto_merge","-i","develop"]
         }
     ]
 }
