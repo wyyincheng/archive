@@ -435,9 +435,40 @@ func abort(action string, commit string) {
 
 func cleanTag(tracking Tracking) {
 
+	// git tag -d 0.0.1 //删除本地tag
+	// git push origin :refs/tags/0.0.1 //删除远程tag
+
+	_, resp := excute("git ls-remote --tags", false)
+	tags := strings.Split(resp, "\n")
+	remoteTags := archiveInfo.tags
+	for _, info := range tags {
+		if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
+			list := strings.Split(info, "refs/tags/")
+			commit := strings.Trim(strings.Replace(list[0], " ", "", -1), " ")
+			remoteTag := "refs/tags/" + list[len(list)-1]
+			if checkTagLegal(list[len(list)-1]) == false {
+				var state State
+				if config.TagClean == Clean {
+					state = Delete
+					deleteTag(remoteTag, tracking)
+				} else {
+					state = Suggest
+					fmt.Printf("  suggest clean tag(%s %s) : \n", tracking, remoteTag)
+				}
+				remoteTags = append(remoteTags, Tag{
+					Name:     remoteTag,
+					Tracking: tracking,
+					State:    state,
+					Commit:   commit,
+				})
+			}
+			archiveInfo.tags = remoteTags
+		}
+	}
+
 }
 
-func cleanBranch(traking Tracking) {
+func cleanBranch(tracking Tracking) {
 	//指定分支，所有分支，本地分支，远程分支
 
 	// excute("git checkout -f", false)
@@ -445,14 +476,14 @@ func cleanBranch(traking Tracking) {
 
 	var result string
 
-	if traking == All {
+	if tracking == All {
 		cleanBranch(Local)
 		cleanBranch(Remote)
 		return
-	} else if traking == Local {
+	} else if tracking == Local {
 		_, resp := excute("git branch --merged", false)
 		result = resp
-	} else if traking == Remote {
+	} else if tracking == Remote {
 		_, resp := excute("git branch -r --merged", false)
 		result = resp
 	}
@@ -472,16 +503,16 @@ func cleanBranch(traking Tracking) {
 		var state State
 		if config.BranchClean == Clean {
 			state = Delete
-			deleteBranch(branch, traking)
+			deleteBranch(branch, tracking)
 		} else {
 			state = Suggest
-			fmt.Printf("  suggest clean branch(%s %s) : \n", traking, branch)
+			fmt.Printf("  suggest clean branch(%s %s) : \n", tracking, branch)
 		}
 
-		commit := fetchLatestCommit("branch", branch, traking)
+		commit := fetchLatestCommit("branch", branch, tracking)
 		branches = append(branches, Branch{
 			Name:     branch,
-			Tracking: traking,
+			Tracking: tracking,
 			State:    state,
 			Commit:   commit,
 		})
@@ -724,8 +755,10 @@ type Branch struct {
 
 //Tag tag信息
 type Tag struct {
-	Name   string
-	Commit string
+	Name     string
+	Commit   string
+	Tracking Tracking
+	State    State
 }
 
 // Tracking type
