@@ -523,10 +523,13 @@ func cleanBranch(tracking Tracking) {
 
 func deleteBranch(branch string, traking Tracking) {
 	fmt.Printf("  delete branch(%s %s) : \n", traking, branch)
+
 }
 
 func deleteTag(tag string, traking Tracking) {
 	fmt.Printf("  delete tag(%s %s) : \n", traking, tag)
+	excute("git tag -d "+strings.Replace(tag, "refs/tags/", "", -1), false)
+	excute("git push origin :"+tag, false)
 }
 
 func lock() {
