@@ -350,15 +350,12 @@ func merge(target string, vtag string) bool {
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
-			archiveInfo.branches = []Branch{
-				{
-					Name:     branch,
-					Tracking: Remote,
-					State:    Merged,
-					Commit:   fetchLatestCommit("branch", branch, Remote),
-				},
-			}
-			// saveArchive(archiveInfo)
+			archiveInfo.Branches = append(archiveInfo.Branches, Branch{
+				Name:     branch,
+				Tracking: Remote,
+				State:    Merged,
+				Commit:   fetchLatestCommit("branch", branch, Remote),
+			})
 			return true
 		}
 		abort("merge", "")
@@ -440,7 +437,6 @@ func cleanTag(tracking Tracking) {
 
 	_, resp := excute("git ls-remote --tags", false)
 	tags := strings.Split(resp, "\n")
-	remoteTags := archiveInfo.tags
 	for _, info := range tags {
 		if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
 			list := strings.Split(info, "refs/tags/")
@@ -455,7 +451,7 @@ func cleanTag(tracking Tracking) {
 					state = Suggest
 					fmt.Printf("  suggest clean tag(%s %s) : \n", tracking, remoteTag)
 				}
-				remoteTags = append(remoteTags, Tag{
+				archiveInfo.Tags = append(archiveInfo.Tags, Tag{
 					Name:     remoteTag,
 					Tracking: tracking,
 					State:    state,
@@ -464,8 +460,6 @@ func cleanTag(tracking Tracking) {
 			}
 		}
 	}
-	archiveInfo.tags = remoteTags
-
 }
 
 func cleanBranch(tracking Tracking) {
@@ -489,7 +483,6 @@ func cleanBranch(tracking Tracking) {
 	}
 
 	resultArray := strings.Split(result, "\n")
-	branches := archiveInfo.branches
 	for _, info := range resultArray {
 		trimStr := strings.Trim(info, " ")
 		branchInfo := strings.Replace(trimStr, "*", "", -1)
@@ -510,15 +503,13 @@ func cleanBranch(tracking Tracking) {
 		}
 
 		commit := fetchLatestCommit("branch", branch, tracking)
-		branches = append(branches, Branch{
+		archiveInfo.Branches = append(archiveInfo.Branches, Branch{
 			Name:     branch,
 			Tracking: tracking,
 			State:    state,
 			Commit:   commit,
 		})
-
 	}
-	archiveInfo.branches = branches
 }
 
 func deleteBranch(branch string, traking Tracking) {
@@ -743,8 +734,8 @@ type Archive struct {
 	Commit   string
 	User     string
 	Email    string
-	branches []Branch
-	tags     []Tag
+	Branches []Branch
+	Tags     []Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
 	Log      string
