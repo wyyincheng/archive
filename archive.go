@@ -768,31 +768,31 @@ const (
 )
 
 // State branch state
-type State int
+type State string
 
 // 分支状态
 const (
-	Merged State = iota
-	Delete
-	Suggest
-	Abort
+	Merged  State = "Merged"
+	Delete  State = "Delete"
+	Suggest State = "Suggest"
+	Abort   State = "Abort"
 )
 
 // Frequency check update frequency
-type Frequency int
+type Frequency string
 
 // 版本更新检测频率
 const (
-	Day Frequency = iota
-	Week
-	Month
+	Day   Frequency = "Day"
+	Week  Frequency = "Week"
+	Month Frequency = "Month"
 )
 
 // Suggestion clean suggestion
-type Suggestion int
+type Suggestion string
 
 // 版本更新检测频率
 const (
-	Prompt Suggestion = iota
-	Clean
+	Prompt Suggestion = "Prompt"
+	Clean  Suggestion = "Clean"
 )
