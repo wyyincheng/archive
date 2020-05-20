@@ -358,7 +358,7 @@ func merge(target string, vtag string) bool {
 					Commit:   fetchLatestCommit("branch", branch, Remote),
 				},
 			}
-			saveArchive(archiveInfo)
+			// saveArchive(archiveInfo)
 			return true
 		}
 		abort("merge", "")
@@ -462,9 +462,9 @@ func cleanTag(tracking Tracking) {
 					Commit:   commit,
 				})
 			}
-			archiveInfo.tags = remoteTags
 		}
 	}
+	archiveInfo.tags = remoteTags
 
 }
 
@@ -571,7 +571,9 @@ func excute(cmdStr string, silent bool) (bool, string) {
 }
 
 func saveArchive(info Archive) {
+	logger.Printf("save archive:%v\n", info)
 	infoJSON, _ := json.Marshal(info)
+	logger.Printf("save archive json:%s\n", infoJSON)
 	archivePath = path.Join(config.WorkSpace, "backup", info.Tag+".json")
 	write(infoJSON, archivePath)
 }
