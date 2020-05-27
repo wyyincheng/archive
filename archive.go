@@ -57,6 +57,7 @@ func buildCLI() {
 		vtag := c.String("t")
 		if len(vtag) > 0 {
 			if checkTagLegal(vtag) {
+				readyArchive()
 				archive(target, vtag)
 				return nil
 			}
@@ -65,6 +66,7 @@ func buildCLI() {
 		}
 
 		if checkTagLegal(c.Args().First()) {
+			readyArchive()
 			archive(target, c.Args().First())
 			return nil
 		}
@@ -115,6 +117,7 @@ func buildCLI() {
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
+				readyArchive()
 				cleanTag(All)
 				cleanBranch(All, config.BranchClean == Clean)
 				saveArchive(archiveInfo)
@@ -127,16 +130,19 @@ func buildCLI() {
 					Action: func(c *cli.Context) error {
 						suggest := c.Bool("s")
 						if c.Bool("a") {
+							readyArchive()
 							cleanBranch(All, suggest)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
+							readyArchive()
 							cleanBranch(Remote, suggest)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
+							readyArchive()
 							cleanBranch(Local, suggest)
 							saveArchive(archiveInfo)
 							return nil
@@ -276,6 +282,12 @@ func buildLogger() {
 	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
 }
 
+func readyArchive() {
+	archiveInfo.Log = logPath
+	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
+	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
+}
+
 func archive(target string, vtag string) {
 
 	/**
@@ -291,8 +303,7 @@ func archive(target string, vtag string) {
 		logger.Fatalf("%s is not available, check and retry.\n", vtag)
 		return
 	}
-	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
-	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
+
 	success := merge(target, vtag)
 	if success {
 		if checkTagLegal(vtag) == false {
@@ -303,7 +314,6 @@ func archive(target string, vtag string) {
 			return
 		}
 		publishTag(target, vtag)
-		archiveInfo.Log = logPath
 		cleanTag(All)
 		cleanBranch(All, config.BranchClean == Clean)
 		saveArchive(archiveInfo)
