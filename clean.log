@@ -1,0 +1,12 @@
+  develop
+  feature/1.0.0/auto_merge
+  feature/1.0.0/publish
+  feature/enum_string
+  feature/v0.0.2
+  feature/v0.0.3
+  feature/v0.0.4
+  feature/v0.0.5
+  feature/v0.0.6
+* master
+  test/newbranche
+  test/newmerge

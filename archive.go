@@ -117,6 +117,7 @@ func buildCLI() {
 			Action: func(c *cli.Context) error {
 				cleanTag(All)
 				cleanBranch(All, config.BranchClean == Clean)
+				saveArchive(archiveInfo)
 				return nil
 			},
 			Subcommands: []*cli.Command{
@@ -127,14 +128,17 @@ func buildCLI() {
 						suggest := c.Bool("s")
 						if c.Bool("a") {
 							cleanBranch(All, suggest)
+							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
 							cleanBranch(Remote, suggest)
+							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
 							cleanBranch(Local, suggest)
+							saveArchive(archiveInfo)
 							return nil
 						}
 						return nil
