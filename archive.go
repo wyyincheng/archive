@@ -491,6 +491,15 @@ func cleanTag(tracking Tracking) {
 }
 
 func cleanBranch(tracking Tracking, clean bool) {
+
+	/**
+	  TODO: 记录并跳过错误，继续后续流程
+	  2020/05/27 19:06:29 /Users/yc/Develop/Golang/GoShell/archive/archive.go:579: git push upstream --delete feature/1.0.0/publish
+	  2020/05/27 19:06:34 /Users/yc/Develop/Golang/GoShell/archive/archive.go:589: To https://github.com/wyyincheng/archive.git
+	   ! [remote rejected] feature/1.0.0/publish (refusing to delete the current branch: refs/heads/feature/1.0.0/publish)
+	  error: failed to push some refs to 'https://github.com/wyyincheng/archive.git'
+	*/
+
 	//指定分支，所有分支，本地分支，远程分支
 
 	// excute("git checkout -f", false)
