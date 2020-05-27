@@ -48,6 +48,8 @@ func buildCLI() {
 	app.Usage = "archive appstore latest version which has been published."
 	app.Action = func(c *cli.Context) error {
 
+		//TODO: log cmd str
+
 		if c.Bool("V") {
 			fmt.Println(appVersion)
 			return nil
@@ -537,9 +539,18 @@ func cleanBranch(tracking Tracking, clean bool) {
 	}
 }
 
-func deleteBranch(branch string, traking Tracking) {
-	fmt.Printf("  delete branch(%s %s) : \n", traking, branch)
-
+func deleteBranch(branch string, tracking Tracking) {
+	fmt.Printf("  delete branch(%s %s) : \n", tracking, branch)
+	if tracking == All {
+		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
+	} else if tracking == Local {
+		excute("git branch -d "+branch, false)
+	} else if tracking == Remote {
+		reg := regexp.MustCompile(`[\w]+`)
+		remote := reg.FindString(branch)
+		name := strings.Replace(branch, remote+"/", "", 1)
+		excute("git push "+remote+" --delete "+name, false)
+	}
 }
 
 func deleteTag(tag string, traking Tracking) {
@@ -725,8 +736,8 @@ func test(target string, vtag string) {
 	// updateVersion()
 	// checkTagLegal(vtag)
 
-	text := "                 ea0e61b Merge remote-tracking branch 'origin/fe...+36 more"
-	reg := regexp.MustCompile(`[\w]+`)
+	text := "  remotes/origin/clean_branch"
+	reg := regexp.MustCompile(`[\w]+/[\w]+`)
 	resutl := reg.FindString(text)
 	fmt.Println(resutl)
 }
