@@ -128,25 +128,28 @@ func buildCLI() {
 					Name:  "branch",
 					Usage: "clean branches which been merged",
 					Action: func(c *cli.Context) error {
-						suggest := c.Bool("s")
+						clean := !c.Bool("s")
 						if c.Bool("a") {
 							readyArchive()
-							cleanBranch(All, suggest)
+							cleanBranch(All, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
 							readyArchive()
-							cleanBranch(Remote, suggest)
+							cleanBranch(Remote, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
 							readyArchive()
-							cleanBranch(Local, suggest)
+							cleanBranch(Local, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
+						readyArchive()
+						cleanBranch(All, clean)
+						saveArchive(archiveInfo)
 						return nil
 					},
 					Flags: []cli.Flag{
@@ -428,7 +431,8 @@ func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 				trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
 				if strings.HasPrefix(trimStr, info) {
 					infos := strings.Replace(trimStr, info+" ", "", 1)
-					cmt := strings.Split(infos, " ")[0]
+					reg := regexp.MustCompile(`[\w]+`)
+					cmt := reg.FindString(infos)
 					logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
 					return cmt
 				}
@@ -511,6 +515,7 @@ func cleanBranch(tracking Tracking, clean bool) {
 		if branch == "master" || branch == "origin/master" || len(branch) == 0 {
 			continue
 		}
+		commit := fetchLatestCommit("branch", branch, tracking)
 		// if config.DefaultBranch.contains(branch) {
 		// continue
 		// }
@@ -520,10 +525,9 @@ func cleanBranch(tracking Tracking, clean bool) {
 			deleteBranch(branch, tracking)
 		} else {
 			state = Suggest
-			fmt.Printf("  suggest clean branch(%s %s) : \n", tracking, branch)
+			fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
 		}
 
-		commit := fetchLatestCommit("branch", branch, tracking)
 		archiveInfo.Branches = append(archiveInfo.Branches, Branch{
 			Name:     branch,
 			Tracking: tracking,
@@ -719,7 +723,12 @@ func updateVersion() {
 
 func test(target string, vtag string) {
 	// updateVersion()
-	checkTagLegal(vtag)
+	// checkTagLegal(vtag)
+
+	text := "                 ea0e61b Merge remote-tracking branch 'origin/fe...+36 more"
+	reg := regexp.MustCompile(`[\w]+`)
+	resutl := reg.FindString(text)
+	fmt.Println(resutl)
 }
 
 // String value for traking
