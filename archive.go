@@ -157,6 +157,12 @@ func buildCLI() {
 							Value:   false,
 							Usage:   "clean local branches which been merged",
 						},
+						&cli.BoolFlag{
+							Name:    "suggest",
+							Aliases: []string{"s"},
+							Value:   false,
+							Usage:   "show branches which been merged without clean",
+						},
 					},
 				},
 				{
