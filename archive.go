@@ -289,6 +289,7 @@ func buildLogger() {
 
 func readyArchive() {
 	archiveInfo.Log = logPath
+	archiveInfo.Tag = localTime()
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 }

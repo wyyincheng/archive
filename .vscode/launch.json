@@ -12,7 +12,7 @@
             "program": "/Users/yc/Develop/Golang/GoShell/archive/archive.go",
             "env": {},
             // "args": ["test"]
-            "args": ["clean","tag","-a"]
+            "args": ["clean","branch","-s"]
         }
     ]
 }
