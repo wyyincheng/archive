@@ -116,7 +116,7 @@ func buildCLI() {
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
 				cleanTag(All)
-				cleanBranch(All)
+				cleanBranch(All, config.BranchClean == Clean)
 				return nil
 			},
 			Subcommands: []*cli.Command{
@@ -124,16 +124,17 @@ func buildCLI() {
 					Name:  "branch",
 					Usage: "clean branches which been merged",
 					Action: func(c *cli.Context) error {
+						suggest := c.Bool("s")
 						if c.Bool("a") {
-							cleanBranch(All)
+							cleanBranch(All, suggest)
 							return nil
 						}
 						if c.Bool("r") {
-							cleanBranch(Remote)
+							cleanBranch(Remote, suggest)
 							return nil
 						}
 						if c.Bool("l") {
-							cleanBranch(Local)
+							cleanBranch(Local, suggest)
 							return nil
 						}
 						return nil
@@ -294,7 +295,7 @@ func archive(target string, vtag string) {
 		publishTag(target, vtag)
 		archiveInfo.Log = logPath
 		cleanTag(All)
-		cleanBranch(All)
+		cleanBranch(All, config.BranchClean == Clean)
 		saveArchive(archiveInfo)
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 		updateVersion()
@@ -462,7 +463,7 @@ func cleanTag(tracking Tracking) {
 	}
 }
 
-func cleanBranch(tracking Tracking) {
+func cleanBranch(tracking Tracking, clean bool) {
 	//指定分支，所有分支，本地分支，远程分支
 
 	// excute("git checkout -f", false)
@@ -471,8 +472,8 @@ func cleanBranch(tracking Tracking) {
 	var result string
 
 	if tracking == All {
-		cleanBranch(Local)
-		cleanBranch(Remote)
+		cleanBranch(Local, clean)
+		cleanBranch(Remote, clean)
 		return
 	} else if tracking == Local {
 		_, resp := excute("git branch --merged", false)
@@ -494,7 +495,7 @@ func cleanBranch(tracking Tracking) {
 		// continue
 		// }
 		var state State
-		if config.BranchClean == Clean {
+		if clean == true {
 			state = Delete
 			deleteBranch(branch, tracking)
 		} else {
