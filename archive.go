@@ -534,7 +534,10 @@ func cleanBranch(tracking Tracking, clean bool) {
 		var state State
 		if clean == true {
 			state = Delete
-			deleteBranch(branch, tracking)
+			success := deleteBranch(branch, tracking)
+			if success == false {
+				state = Error
+			}
 		} else {
 			state = Suggest
 			fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
@@ -549,18 +552,22 @@ func cleanBranch(tracking Tracking, clean bool) {
 	}
 }
 
-func deleteBranch(branch string, tracking Tracking) {
+func deleteBranch(branch string, tracking Tracking) bool {
 	fmt.Printf("  delete branch(%s %s) : \n", tracking, branch)
+	var success = false
 	if tracking == All {
 		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
 	} else if tracking == Local {
-		excute("git branch -d "+branch, false)
+		reuslt, _ := excute("git branch -d "+branch, true)
+		success = reuslt
 	} else if tracking == Remote {
 		reg := regexp.MustCompile(`[\w]+`)
 		remote := reg.FindString(branch)
 		name := strings.Replace(branch, remote+"/", "", 1)
-		excute("git push "+remote+" --delete "+name, false)
+		reuslt, _ := excute("git push "+remote+" --delete "+name, false)
+		success = reuslt
 	}
+	return success
 }
 
 func deleteTag(tag string, traking Tracking) {
@@ -597,6 +604,7 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	if err != nil {
 		logger.Println(errStr)
 		if silent == false {
+			saveArchive(archiveInfo)
 			//静默处理：正常返回处理结果，不结束程序
 			log.Fatal(err)
 		}
@@ -827,6 +835,7 @@ const (
 	Delete  State = "Delete"
 	Suggest State = "Suggest"
 	Abort   State = "Abort"
+	Error   State = "Error"
 )
 
 // Frequency check update frequency
