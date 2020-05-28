@@ -133,23 +133,27 @@ func buildCLI() {
 						clean := !c.Bool("s")
 						if c.Bool("a") {
 							readyArchive()
+							excute("git fetch", false)
 							cleanBranch(All, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
 							readyArchive()
+							excute("git fetch", false)
 							cleanBranch(Remote, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
 							readyArchive()
+							excute("git fetch", false)
 							cleanBranch(Local, clean)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						readyArchive()
+						excute("git fetch", false)
 						cleanBranch(All, clean)
 						saveArchive(archiveInfo)
 						return nil
