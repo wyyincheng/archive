@@ -564,7 +564,7 @@ func deleteBranch(branch string, tracking Tracking) bool {
 		reg := regexp.MustCompile(`[\w]+`)
 		remote := reg.FindString(branch)
 		name := strings.Replace(branch, remote+"/", "", 1)
-		reuslt, _ := excute("git push "+remote+" --delete "+name, false)
+		reuslt, _ := excute("git push "+remote+" --delete "+name, true)
 		success = reuslt
 	}
 	return success
