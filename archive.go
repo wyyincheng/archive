@@ -187,7 +187,7 @@ func buildCLI() {
 						&cli.StringFlag{
 							Name:    "ignore",
 							Aliases: []string{"i"},
-							Usage:   "ignore branches which been merged without clean",
+							Usage:   "ignore branches which been merged without clean. eg: archive clean branch -i \"feature\\/v[0-9]+.[0-9]+.[0-9]+|master|feature/1.0.0/publish\"",
 						},
 					},
 				},
@@ -609,7 +609,6 @@ func checkBranch(branch string, tracking Tracking, ignore string) (State, string
 }
 
 func deleteBranch(branch string, tracking Tracking, ignore string) State {
-	fmt.Printf("  delete branch(%s %s) : \n", tracking, branch)
 	var success = Error
 	if tracking == All {
 		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
@@ -618,13 +617,16 @@ func deleteBranch(branch string, tracking Tracking, ignore string) State {
 		reg := regexp.MustCompile(ignore)
 		resutl := reg.FindString(branch)
 		if resutl == branch {
+			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
 			return Ignore
 		}
 
 		reuslt, _ := excute("git branch -d "+branch, true)
 		if reuslt == true {
+			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
 			success = Success
 		} else {
+			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
 			success = Error
 		}
 	} else if tracking == Remote {
@@ -635,13 +637,16 @@ func deleteBranch(branch string, tracking Tracking, ignore string) State {
 		breg := regexp.MustCompile(ignore)
 		resutl := breg.FindString(name)
 		if resutl == branch {
+			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
 			return Ignore
 		}
 
 		reuslt, _ := excute("git push "+remote+" --delete "+name, true)
 		if reuslt == true {
+			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
 			success = Success
 		} else {
+			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
 			success = Error
 		}
 	}
