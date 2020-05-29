@@ -121,7 +121,7 @@ func buildCLI() {
 			Action: func(c *cli.Context) error {
 				readyArchive()
 				cleanTag(All)
-				cleanBranch(All, config.BranchClean == Clean)
+				cleanBranch(All, config.BranchClean == Clean, "")
 				saveArchive(archiveInfo)
 				return nil
 			},
@@ -130,31 +130,32 @@ func buildCLI() {
 					Name:  "branch",
 					Usage: "clean branches which been merged",
 					Action: func(c *cli.Context) error {
+						ignore := c.String("i")
 						clean := !c.Bool("s")
 						if c.Bool("a") {
 							readyArchive()
 							excute("git fetch", false)
-							cleanBranch(All, clean)
+							cleanBranch(All, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
 							readyArchive()
 							excute("git fetch", false)
-							cleanBranch(Remote, clean)
+							cleanBranch(Remote, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
 							readyArchive()
 							excute("git fetch", false)
-							cleanBranch(Local, clean)
+							cleanBranch(Local, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						readyArchive()
 						excute("git fetch", false)
-						cleanBranch(All, clean)
+						cleanBranch(All, clean, ignore)
 						saveArchive(archiveInfo)
 						return nil
 					},
@@ -182,6 +183,11 @@ func buildCLI() {
 							Aliases: []string{"s"},
 							Value:   false,
 							Usage:   "show branches which been merged without clean",
+						},
+						&cli.StringFlag{
+							Name:    "ignore",
+							Aliases: []string{"i"},
+							Usage:   "ignore branches which been merged without clean",
 						},
 					},
 				},
@@ -261,10 +267,17 @@ func buildCLI() {
 			Name:  "test",
 			Usage: "test cmd",
 			Action: func(c *cli.Context) error {
-				target := c.String("into")
+				// target := c.String("into")
 				vtag := c.String("t")
-				test(target, vtag)
+				test(c.String("i"), vtag)
 				return nil
+			},
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "ignore",
+					Aliases: []string{"i"},
+					Usage:   "ignore branches which been merged without clean",
+				},
 			},
 		},
 	}
@@ -325,7 +338,7 @@ func archive(target string, vtag string) {
 		}
 		publishTag(target, vtag)
 		cleanTag(All)
-		cleanBranch(All, config.BranchClean == Clean)
+		cleanBranch(All, config.BranchClean == Clean, "")
 		saveArchive(archiveInfo)
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 		updateVersion()
@@ -494,7 +507,7 @@ func cleanTag(tracking Tracking) {
 	}
 }
 
-func cleanBranch(tracking Tracking, clean bool) {
+func cleanBranch(tracking Tracking, clean bool, ignore string) {
 
 	/**
 	  TODO: 记录并跳过错误，继续后续流程
@@ -512,8 +525,8 @@ func cleanBranch(tracking Tracking, clean bool) {
 	var result string
 
 	if tracking == All {
-		cleanBranch(Local, clean)
-		cleanBranch(Remote, clean)
+		cleanBranch(Local, clean, ignore)
+		cleanBranch(Remote, clean, ignore)
 		return
 	} else if tracking == Local {
 		_, resp := excute("git branch --merged", false)
@@ -531,6 +544,7 @@ func cleanBranch(tracking Tracking, clean bool) {
 		if branch == "master" || branch == "origin/master" || len(branch) == 0 {
 			continue
 		}
+
 		commit := fetchLatestCommit("branch", branch, tracking)
 		// if config.DefaultBranch.contains(branch) {
 		// continue
@@ -538,12 +552,22 @@ func cleanBranch(tracking Tracking, clean bool) {
 		var state State
 		if clean == true {
 			state = Delete
-			success := deleteBranch(branch, tracking)
-			if success == false {
+			success := deleteBranch(branch, tracking, ignore)
+			if success == Ignore {
+				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+				continue
+			}
+			if success == Error {
 				state = Error
 			}
 		} else {
 			state = Suggest
+			result, _, _ := checkBranch(branch, tracking, ignore)
+			if result == Ignore {
+				fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+				continue
+			}
 			fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
 		}
 
@@ -556,20 +580,70 @@ func cleanBranch(tracking Tracking, clean bool) {
 	}
 }
 
-func deleteBranch(branch string, tracking Tracking) bool {
+func checkBranch(branch string, tracking Tracking, ignore string) (State, string, string) {
+	fmt.Printf("  check branch(%s %s) : \n", tracking, branch)
+	var success = Suggest
+	var remote = ""
+	var name = branch
+	if tracking == All {
+		logger.Fatalf("check branch error: (%s %s)\n", tracking, branch)
+	} else if tracking == Local {
+
+		reg := regexp.MustCompile(ignore)
+		resutl := reg.FindString(branch)
+		if resutl == name {
+			return Ignore, remote, name
+		}
+	} else if tracking == Remote {
+		reg := regexp.MustCompile(`[\w]+`)
+		remote = reg.FindString(branch)
+		name = strings.Replace(branch, remote+"/", "", 1)
+
+		breg := regexp.MustCompile(ignore)
+		resutl := breg.FindString(name)
+		if resutl == name {
+			return Ignore, remote, name
+		}
+	}
+	return success, remote, name
+}
+
+func deleteBranch(branch string, tracking Tracking, ignore string) State {
 	fmt.Printf("  delete branch(%s %s) : \n", tracking, branch)
-	var success = false
+	var success = Error
 	if tracking == All {
 		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
 	} else if tracking == Local {
+
+		reg := regexp.MustCompile(ignore)
+		resutl := reg.FindString(branch)
+		if resutl == branch {
+			return Ignore
+		}
+
 		reuslt, _ := excute("git branch -d "+branch, true)
-		success = reuslt
+		if reuslt == true {
+			success = Success
+		} else {
+			success = Error
+		}
 	} else if tracking == Remote {
 		reg := regexp.MustCompile(`[\w]+`)
 		remote := reg.FindString(branch)
 		name := strings.Replace(branch, remote+"/", "", 1)
+
+		breg := regexp.MustCompile(ignore)
+		resutl := breg.FindString(name)
+		if resutl == branch {
+			return Ignore
+		}
+
 		reuslt, _ := excute("git push "+remote+" --delete "+name, true)
-		success = reuslt
+		if reuslt == true {
+			success = Success
+		} else {
+			success = Error
+		}
 	}
 	return success
 }
@@ -758,8 +832,8 @@ func test(target string, vtag string) {
 	// updateVersion()
 	// checkTagLegal(vtag)
 
-	text := "  remotes/origin/clean_branch"
-	reg := regexp.MustCompile(`[\w]+/[\w]+`)
+	text := "feature/v9.4.1"
+	reg := regexp.MustCompile(target)
 	resutl := reg.FindString(text)
 	fmt.Println(resutl)
 }
@@ -840,6 +914,8 @@ const (
 	Suggest State = "Suggest"
 	Abort   State = "Abort"
 	Error   State = "Error"
+	Ignore  State = "Ignore"
+	Success State = "Success"
 )
 
 // Frequency check update frequency
