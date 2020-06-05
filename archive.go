@@ -136,6 +136,7 @@ func buildCLI() {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(All, clean, ignore)
+							needCleanBranch(All, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
@@ -143,6 +144,7 @@ func buildCLI() {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(Remote, clean, ignore)
+							needCleanBranch(Remote, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
@@ -150,12 +152,14 @@ func buildCLI() {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(Local, clean, ignore)
+							needCleanBranch(Local, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						readyArchive()
 						excute("git fetch", false)
 						cleanBranch(All, clean, ignore)
+						needCleanBranch(All, clean, ignore)
 						saveArchive(archiveInfo)
 						return nil
 					},
@@ -568,11 +572,12 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 			state = Suggest
 			result, _, _ := checkBranch(branch, tracking, ignore)
 			if result == Ignore {
-				fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+				// fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
 				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
 				continue
 			}
 			fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
+			logger.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
 		}
 
 		archiveInfo.Branches = append(archiveInfo.Branches, Branch{
@@ -584,8 +589,117 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 	}
 }
 
+// 分支清理后再扫描一遍，看下有没有时间过久的分支，提示用户清理掉
+func needCleanBranch(tracking Tracking, clean bool, ignore string) {
+
+	mergedBranches := mergedBranches(tracking, ignore)
+	oldestBranches := oldestBranches(tracking, ignore)
+	// suggestCleanBranches := append(mergedBranches, oldestBranches...)
+
+	fmt.Println("\n\nThese merged branches was suggested clean:")
+	for _, branch := range mergedBranches {
+		if branch.State == Merged {
+			fmt.Printf("  %s %s %s \n", tracking, branch.Name, branch.Commit)
+		} else {
+			logger.Printf("needCleanBranch error logict: unkonw state")
+		}
+	}
+
+	fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
+	for _, branch := range oldestBranches {
+		if branch.State == Oldest {
+			fmt.Printf("  %s %s %s \n", tracking, branch.Name, branch.Commit)
+		} else {
+			logger.Printf("needCleanBranch error logict: unkonw state")
+		}
+	}
+}
+
+func mergedBranches(tracking Tracking, ignore string) []Branch {
+	var mergedResult string
+	if tracking == All {
+		localArray := mergedBranches(Local, ignore)
+		remoteArray := mergedBranches(Remote, ignore)
+		return append(localArray, remoteArray...)
+	} else if tracking == Local {
+		_, resp := excute("git branch --merged", false)
+		mergedResult = resp
+	} else if tracking == Remote {
+		_, resp := excute("git branch -r --merged", false)
+		mergedResult = resp
+	}
+	return splitBranch(mergedResult, tracking, ignore, Merged)
+}
+
+func oldestBranches(tracking Tracking, ignore string) []Branch {
+	var oldestResult string
+	var oldBranches []Branch
+	if tracking == All {
+		localArray := oldestBranches(Local, ignore)
+		remoteArray := oldestBranches(Remote, ignore)
+		return append(localArray, remoteArray...)
+	} else if tracking == Local {
+		_, resp := excute("git branch", false)
+		oldestResult = resp
+	} else if tracking == Remote {
+		_, resp := excute("git branch -r", false)
+		oldestResult = resp
+	}
+	branches := splitBranch(oldestResult, tracking, ignore, Oldest)
+	for _, branch := range branches {
+		_, ctStr := excute("git log --pretty=format:“%ct” "+branch.Commit+" -1", false)
+		ctStr = strings.Replace(ctStr, "“", "", -1)
+		ctStr = strings.Replace(ctStr, "”", "", -1)
+		//TODO: 数字提取正则
+		ct, err := strconv.ParseInt(ctStr, 10, 64)
+		if err == nil && checkOutDate(ct, 24*14) {
+			//以下分支超两周未更新，建议确认后清理
+			// fmt.Printf("oldest branch(%s %s %s) : \n", tracking, branch.Name, branch.Commit)
+			oldBranches = append(oldBranches, branch)
+		}
+	}
+	return oldBranches
+}
+
+// 检测时间是是否过期，与当前时间比对， ct：比对时间， gap：间隔，单位小时
+func checkOutDate(ct int64, gap float64) bool {
+	tm := time.Unix(ct, 0)
+	diff := time.Now().Sub(tm).Hours()
+	return diff > gap
+}
+
+func splitBranch(result string, tracking Tracking, ignore string, state State) []Branch {
+	//追加默认分支、保护分支
+	ignore = ignore + "|master"
+	var resultBranches []Branch
+	resultArray := strings.Split(result, "\n")
+	for _, info := range resultArray {
+		trimStr := strings.Trim(info, " ")
+		branchInfo := strings.Replace(trimStr, "*", "", -1)
+		branch := strings.Trim(branchInfo, " ")
+		if len(branch) == 0 {
+			continue
+		}
+
+		commit := fetchLatestCommit("branch", branch, tracking)
+		result, _, _ := checkBranch(branch, tracking, ignore)
+		if result == Ignore {
+			// fmt.Printf("splitBranch ignore branch(%s %s %s) : \n", tracking, branch, commit)
+			// logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+			continue
+		}
+
+		resultBranches = append(resultBranches, Branch{
+			Name:     branch,
+			Tracking: tracking,
+			State:    state,
+			Commit:   commit,
+		})
+	}
+	return resultBranches
+}
+
 func checkBranch(branch string, tracking Tracking, ignore string) (State, string, string) {
-	fmt.Printf("  check branch(%s %s) : \n", tracking, branch)
 	var success = Suggest
 	var remote = ""
 	var name = branch
@@ -925,6 +1039,7 @@ const (
 	Error   State = "Error"
 	Ignore  State = "Ignore"
 	Success State = "Success"
+	Oldest  State = "Oldest"
 )
 
 // Frequency check update frequency
