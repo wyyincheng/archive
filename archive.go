@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	appVersion  = "v0.0.2"
+	appVersion  = "v0.0.9"
 	configPath  = "/usr/local/share/YCLI/Archive"
 	app         = cli.NewApp()
 	config      = Config{}
@@ -377,6 +377,8 @@ func merge(target string, vtag string) bool {
 	3.代码同步
 	4.记录并merge
 	5.同步
+
+	//TODO: merge到master后通知vtag之后的版本分支同步master
 	*/
 	success, branch := search(vtag)
 	if success {
@@ -508,6 +510,8 @@ func cleanTag(tracking Tracking) {
 }
 
 func cleanBranch(tracking Tracking, clean bool, ignore string) {
+
+	// 当前分支及对应远程分支保留
 
 	/**
 	  TODO: 记录并跳过错误，继续后续流程
