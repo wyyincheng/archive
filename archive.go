@@ -634,7 +634,7 @@ func deleteBranch(branch string, tracking Tracking, ignore string) State {
 			success = Error
 		}
 	} else if tracking == Remote {
-		reg := regexp.MustCompile(`[\w]+`)
+		reg := regexp.MustCompile(ignore)
 		remote := reg.FindString(branch)
 		name := strings.Replace(branch, remote+"/", "", 1)
 
