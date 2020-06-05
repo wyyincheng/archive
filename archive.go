@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	appVersion  = "v0.0.9"
+	appVersion  = "v0.0.10-beta"
 	configPath  = "/usr/local/share/YCLI/Archive"
 	app         = cli.NewApp()
 	config      = Config{}
@@ -54,6 +54,9 @@ func buildCLI() {
 			fmt.Println(appVersion)
 			return nil
 		}
+
+		fmt.Println("archive -h 查看已开放功能")
+		return nil
 
 		target := c.String("into")
 		vtag := c.String("t")
@@ -107,23 +110,57 @@ func buildCLI() {
 		},
 	}
 	app.Commands = []*cli.Command{
-		{
-			Name:  "lock",
-			Usage: "lock tag or branch",
-			Action: func(c *cli.Context) error {
-				fmt.Println("lock tag or branch")
-				return nil
-			},
-		},
+		// {
+		// 	Name:  "lock",
+		// 	Usage: "lock tag or branch",
+		// 	Action: func(c *cli.Context) error {
+		// 		fmt.Println("lock tag or branch")
+		// 		return nil
+		// 	},
+		// },
 		{
 			Name:  "clean",
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
+				ignore := c.String("i")
 				readyArchive()
+				fmt.Println("\n🛠start clean tags.")
 				cleanTag(All)
-				cleanBranch(All, config.BranchClean == Clean, "")
+				fmt.Println("\n🛠start clean branches.")
+				cleanBranch(All, config.BranchClean == Clean, ignore)
 				saveArchive(archiveInfo)
 				return nil
+			},
+			Flags: []cli.Flag{
+				// &cli.BoolFlag{
+				// 	Name:    "all",
+				// 	Aliases: []string{"a"},
+				// 	Value:   false,
+				// 	Usage:   "clean all branches which been merged",
+				// },
+				// &cli.BoolFlag{
+				// 	Name:    "remote",
+				// 	Aliases: []string{"r"},
+				// 	Value:   false,
+				// 	Usage:   "clean remote branches which been merged",
+				// },
+				// &cli.BoolFlag{
+				// 	Name:    "local",
+				// 	Aliases: []string{"l"},
+				// 	Value:   false,
+				// 	Usage:   "clean local branches which been merged",
+				// },
+				// &cli.BoolFlag{
+				// 	Name:    "suggest",
+				// 	Aliases: []string{"s"},
+				// 	Value:   false,
+				// 	Usage:   "show branches which been merged without clean",
+				// },
+				&cli.StringFlag{
+					Name:    "ignore",
+					Aliases: []string{"i"},
+					Usage:   "ignore branches which been merged without clean. eg: archive clean branch -i \"feature\\/v[0-9]+.[0-9]+.[0-9]+|master|feature/1.0.0/publish\"",
+				},
 			},
 			Subcommands: []*cli.Command{
 				{
@@ -132,11 +169,22 @@ func buildCLI() {
 					Action: func(c *cli.Context) error {
 						ignore := c.String("i")
 						clean := !c.Bool("s")
+						var tracking Tracking = All
+						if c.Bool("r") {
+							tracking = Remote
+						} else if c.Bool("l") {
+							tracking = Local
+						}
+
+						if clean == false {
+							needCleanBranch(tracking, ignore)
+							return nil
+						}
+
 						if c.Bool("a") {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(All, clean, ignore)
-							needCleanBranch(All, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
@@ -144,7 +192,6 @@ func buildCLI() {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(Remote, clean, ignore)
-							needCleanBranch(Remote, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
@@ -152,14 +199,12 @@ func buildCLI() {
 							readyArchive()
 							excute("git fetch", false)
 							cleanBranch(Local, clean, ignore)
-							needCleanBranch(Local, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						readyArchive()
 						excute("git fetch", false)
 						cleanBranch(All, clean, ignore)
-						needCleanBranch(All, clean, ignore)
 						saveArchive(archiveInfo)
 						return nil
 					},
@@ -199,6 +244,8 @@ func buildCLI() {
 					Name:  "tag",
 					Usage: "clean tag which out of range rule",
 					Action: func(c *cli.Context) error {
+						fmt.Println("功能即将开放")
+						return nil
 						if c.Bool("a") {
 							cleanTag(All)
 							return nil
@@ -240,6 +287,7 @@ func buildCLI() {
 			Name:  "abort",
 			Usage: "rollback archive which version you given",
 			Action: func(c *cli.Context) error {
+				fmt.Println("功能暂未开放")
 				return nil
 			},
 		},
@@ -267,23 +315,23 @@ func buildCLI() {
 				},
 			},
 		},
-		{
-			Name:  "test",
-			Usage: "test cmd",
-			Action: func(c *cli.Context) error {
-				// target := c.String("into")
-				vtag := c.String("t")
-				test(c.String("i"), vtag)
-				return nil
-			},
-			Flags: []cli.Flag{
-				&cli.StringFlag{
-					Name:    "ignore",
-					Aliases: []string{"i"},
-					Usage:   "ignore branches which been merged without clean",
-				},
-			},
-		},
+		// {
+		// 	Name:  "test",
+		// 	Usage: "test cmd",
+		// 	Action: func(c *cli.Context) error {
+		// 		// target := c.String("into")
+		// 		vtag := c.String("t")
+		// 		test(c.String("i"), vtag)
+		// 		return nil
+		// 	},
+		// 	Flags: []cli.Flag{
+		// 		&cli.StringFlag{
+		// 			Name:    "ignore",
+		// 			Aliases: []string{"i"},
+		// 			Usage:   "ignore branches which been merged without clean",
+		// 		},
+		// 	},
+		// },
 	}
 
 	// sort.Sort(cli.FlagsByName(app.Flags))
@@ -482,7 +530,8 @@ func abort(action string, commit string) {
 }
 
 func cleanTag(tracking Tracking) {
-
+	fmt.Println("archive clean tags nothing")
+	return
 	// git tag -d 0.0.1 //删除本地tag
 	// git push origin :refs/tags/0.0.1 //删除远程tag
 
@@ -569,15 +618,17 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 				state = Error
 			}
 		} else {
-			state = Suggest
-			result, _, _ := checkBranch(branch, tracking, ignore)
-			if result == Ignore {
-				// fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-				continue
-			}
-			fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
-			logger.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
+			logger.Printf("cleanBranch error logic. (%s %s %s) : \n", tracking, branch, commit)
+			// needCleanBranch(tracking,ignore)
+			// state = Suggest
+			// result, _, _ := checkBranch(branch, tracking, ignore)
+			// if result == Ignore {
+			// 	// fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+			// 	logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
+			// 	continue
+			// }
+			// fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
+			// logger.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
 		}
 
 		archiveInfo.Branches = append(archiveInfo.Branches, Branch{
@@ -590,7 +641,7 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 }
 
 // 分支清理后再扫描一遍，看下有没有时间过久的分支，提示用户清理掉
-func needCleanBranch(tracking Tracking, clean bool, ignore string) {
+func needCleanBranch(tracking Tracking, ignore string) {
 
 	mergedBranches := mergedBranches(tracking, ignore)
 	oldestBranches := oldestBranches(tracking, ignore)
@@ -608,7 +659,7 @@ func needCleanBranch(tracking Tracking, clean bool, ignore string) {
 	fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
 	for _, branch := range oldestBranches {
 		if branch.State == Oldest {
-			fmt.Printf("  %s %s %s \n", tracking, branch.Name, branch.Commit)
+			fmt.Printf("  %s %s %s %s\n", tracking, branch.Name, branch.Commit, branch.Desc)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
 		}
@@ -655,6 +706,14 @@ func oldestBranches(tracking Tracking, ignore string) []Branch {
 		if err == nil && checkOutDate(ct, 24*14) {
 			//以下分支超两周未更新，建议确认后清理
 			// fmt.Printf("oldest branch(%s %s %s) : \n", tracking, branch.Name, branch.Commit)
+			_, auth := excute("git log --pretty=format:“%aN” "+branch.Commit+" -1", false)
+			auth = strings.Replace(auth, "“", "", -1)
+			auth = strings.Replace(auth, "”", "", -1)
+			// _, email := excute("git log --pretty=format:“%ae” "+branch.Commit+" -1", false)
+			// email = strings.Replace(email, "“", "", -1)
+			// email = strings.Replace(email, "”", "", -1)
+			// branch.Desc = "Auth:" + auth + " Email:" + email
+			branch.Desc = "@" + auth
 			oldBranches = append(oldBranches, branch)
 		}
 	}
@@ -1007,6 +1066,7 @@ type Branch struct {
 	Commit   string
 	Tracking Tracking
 	State    State
+	Desc     string
 }
 
 //Tag tag信息
