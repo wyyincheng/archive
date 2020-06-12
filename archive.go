@@ -34,11 +34,11 @@ var (
 
 func main() {
 	loadConfig()
-	buildLogger()
 	buildCLI()
 
 	err := app.Run(os.Args)
 	if err != nil {
+		saveArchive()
 		logger.Fatal(err)
 	}
 }
@@ -59,8 +59,9 @@ func buildCLI() {
 		vtag := c.String("t")
 		if len(vtag) > 0 {
 			if checkTagLegal(vtag) {
-				readyArchive()
+				readyArchive("archive_tag")
 				archive(target, vtag)
+				saveArchive()
 				return nil
 			}
 			fmt.Printf("%s is not legal, check and input like: v1.0.0\n", vtag)
@@ -68,8 +69,9 @@ func buildCLI() {
 		}
 
 		if checkTagLegal(c.Args().First()) {
-			readyArchive()
+			readyArchive("archive_version")
 			archive(target, c.Args().First())
+			saveArchive()
 			return nil
 		}
 
@@ -120,12 +122,12 @@ func buildCLI() {
 			Usage: "clean tags and branches after archive",
 			Action: func(c *cli.Context) error {
 				ignore := c.String("i")
-				readyArchive()
+				readyArchive("clean_all")
 				fmt.Println("\n🛠start clean tags.")
 				cleanTag(All, ignore)
 				fmt.Println("\n🛠start clean branches.")
 				cleanBranch(All, config.BranchClean == Clean, ignore)
-				saveArchive(archiveInfo)
+				saveArchive()
 				return nil
 			},
 			Flags: []cli.Flag{
@@ -179,25 +181,25 @@ func buildCLI() {
 							return nil
 						}
 
-						readyArchive()
+						readyArchive("clean_branch")
 						if c.Bool("a") {
 							cleanBranch(All, clean, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 						if c.Bool("r") {
 							cleanBranch(Remote, clean, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 						if c.Bool("l") {
 							cleanBranch(Local, clean, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 
 						cleanBranch(All, clean, ignore)
-						saveArchive(archiveInfo)
+						saveArchive()
 						return nil
 					},
 					Flags: []cli.Flag{
@@ -252,25 +254,25 @@ func buildCLI() {
 							return nil
 						}
 
-						readyArchive()
+						readyArchive("clean_tag")
 						excute("git pull", true)
 						if c.Bool("a") {
 							cleanTag(All, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 						if c.Bool("r") {
 							cleanTag(Remote, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 						if c.Bool("l") {
 							cleanTag(Local, ignore)
-							saveArchive(archiveInfo)
+							saveArchive()
 							return nil
 						}
 						cleanTag(tracking, ignore)
-						saveArchive(archiveInfo)
+						saveArchive()
 						return nil
 					},
 					Flags: []cli.Flag{
@@ -363,8 +365,8 @@ func buildCLI() {
 
 }
 
-func buildLogger() {
-	logPath = path.Join(config.WorkSpace, "Logs", strconv.FormatInt(time.Now().Unix(), 10)+".log")
+func buildLogger(logName string) {
+	logPath = path.Join(config.WorkSpace, "Logs", logName+"_"+strconv.FormatInt(time.Now().Unix(), 10)+".log")
 	dirPath := path.Dir(logPath)
 	mkErr := os.MkdirAll(dirPath, os.ModePerm)
 	if mkErr != nil {
@@ -380,7 +382,8 @@ func buildLogger() {
 	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
 }
 
-func readyArchive() {
+func readyArchive(logName string) {
+	buildLogger(logName)
 	archiveInfo.Log = logPath
 	archiveInfo.Tag = localTime()
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
@@ -406,7 +409,6 @@ func archive(target string, vtag string) {
 	success := merge(target, vtag)
 	if success {
 		if checkTagLegal(vtag) == false {
-			saveArchive(archiveInfo)
 			fmt.Printf("Auto merge success, but publish tag(%s) failure. You can use `archive clean` after push tag success.\n", vtag)
 			fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 			updateVersion()
@@ -415,7 +417,6 @@ func archive(target string, vtag string) {
 		publishTag(target, vtag)
 		cleanTag(All, "")
 		cleanBranch(All, config.BranchClean == Clean, "")
-		saveArchive(archiveInfo)
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 		updateVersion()
 		return
@@ -857,6 +858,7 @@ func checkBranch(branch string, tracking Tracking, ignore string) (State, string
 	var remote = ""
 	var name = branch
 	if tracking == All {
+		saveArchive()
 		logger.Fatalf("check branch error: (%s %s)\n", tracking, branch)
 	} else if tracking == Local {
 
@@ -882,6 +884,7 @@ func checkBranch(branch string, tracking Tracking, ignore string) (State, string
 func deleteBranch(branch string, tracking Tracking, ignore string) State {
 	var success = Error
 	if tracking == All {
+		saveArchive()
 		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
 	} else if tracking == Local {
 
@@ -957,6 +960,7 @@ func lock() {
 func checkCMD(cmd string) {
 	_, err := exec.LookPath(cmd)
 	if err != nil {
+		saveArchive()
 		logger.Fatal(err)
 	}
 }
@@ -975,9 +979,9 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	if err != nil {
 		logger.Println(errStr)
 		if silent == false {
-			saveArchive(archiveInfo)
+			saveArchive()
 			//静默处理：正常返回处理结果，不结束程序
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		return false, errStr
 	}
@@ -986,11 +990,11 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	return true, outStr
 }
 
-func saveArchive(info Archive) {
-	logger.Printf("save archive:%v\n", info)
-	infoJSON, _ := json.Marshal(info)
+func saveArchive() {
+	logger.Printf("save archive:%v\n", archiveInfo)
+	infoJSON, _ := json.Marshal(archiveInfo)
 	logger.Printf("save archive json:%s\n", infoJSON)
-	archivePath = path.Join(config.WorkSpace, "backup", info.Tag+".json")
+	archivePath = path.Join(config.WorkSpace, "backup", archiveInfo.Tag+".json")
 	write(infoJSON, archivePath)
 }
 
@@ -1005,11 +1009,13 @@ func write(json []byte, filePath string) {
 		dirPath := path.Dir(filePath)
 		mkErr := os.MkdirAll(dirPath, os.ModePerm)
 		if mkErr != nil {
+			saveArchive()
 			logger.Fatal(mkErr)
 			return
 		}
 		writeErr := ioutil.WriteFile(filePath, json, os.ModePerm)
 		if writeErr != nil {
+			saveArchive()
 			logger.Fatal(writeErr)
 			return
 		}
@@ -1045,12 +1051,14 @@ func loadConfig() {
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		//Log load config failure
+		saveArchive()
 		logger.Fatal(err)
 	}
 	var localConfig Config
 	err = json.Unmarshal(data, &localConfig)
 	if err != nil {
 		//Log load config failure
+		saveArchive()
 		logger.Fatal(err)
 	}
 	config = localConfig
