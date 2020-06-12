@@ -125,7 +125,7 @@ func buildCLI() {
 				ignore := c.String("i")
 				readyArchive()
 				fmt.Println("\n🛠start clean tags.")
-				cleanTag(All)
+				cleanTag(All, ignore)
 				fmt.Println("\n🛠start clean branches.")
 				cleanBranch(All, config.BranchClean == Clean, ignore)
 				saveArchive(archiveInfo)
@@ -244,18 +244,31 @@ func buildCLI() {
 					Name:  "tag",
 					Usage: "clean tag which out of range rule",
 					Action: func(c *cli.Context) error {
-						fmt.Println("功能即将开放")
-						return nil
+
+						ignore := c.String("i")
+						clean := !c.Bool("s")
+						var tracking Tracking = All
+						if c.Bool("r") {
+							tracking = Remote
+						} else if c.Bool("l") {
+							tracking = Local
+						}
+
+						if clean == false {
+							needCleanTag(tracking, ignore)
+							return nil
+						}
+
 						if c.Bool("a") {
-							cleanTag(All)
+							cleanTag(All, ignore)
 							return nil
 						}
 						if c.Bool("r") {
-							cleanTag(Remote)
+							cleanTag(Remote, ignore)
 							return nil
 						}
 						if c.Bool("l") {
-							cleanTag(Local)
+							cleanTag(Local, ignore)
 							return nil
 						}
 						return nil
@@ -315,23 +328,23 @@ func buildCLI() {
 				},
 			},
 		},
-		// {
-		// 	Name:  "test",
-		// 	Usage: "test cmd",
-		// 	Action: func(c *cli.Context) error {
-		// 		// target := c.String("into")
-		// 		vtag := c.String("t")
-		// 		test(c.String("i"), vtag)
-		// 		return nil
-		// 	},
-		// 	Flags: []cli.Flag{
-		// 		&cli.StringFlag{
-		// 			Name:    "ignore",
-		// 			Aliases: []string{"i"},
-		// 			Usage:   "ignore branches which been merged without clean",
-		// 		},
-		// 	},
-		// },
+		{
+			Name:  "test",
+			Usage: "test cmd",
+			Action: func(c *cli.Context) error {
+				// target := c.String("into")
+				vtag := c.String("t")
+				test(c.String("i"), vtag)
+				return nil
+			},
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:    "ignore",
+					Aliases: []string{"i"},
+					Usage:   "ignore branches which been merged without clean",
+				},
+			},
+		},
 	}
 
 	// sort.Sort(cli.FlagsByName(app.Flags))
@@ -389,7 +402,7 @@ func archive(target string, vtag string) {
 			return
 		}
 		publishTag(target, vtag)
-		cleanTag(All)
+		cleanTag(All, "")
 		cleanBranch(All, config.BranchClean == Clean, "")
 		saveArchive(archiveInfo)
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
@@ -513,7 +526,13 @@ func fetchLatestCommit(sort string, info string, tracking Tracking) string {
 			}
 		}
 	} else if sort == "tag" {
-
+		success, commitInfo := excute("git show "+info, true)
+		if success {
+			reg := regexp.MustCompile(`commit [\w]+`)
+			resutl := reg.FindString(commitInfo)
+			commit := strings.Replace(resutl, "commit ", "", -1)
+			return commit
+		}
 	}
 	logger.Printf("'%s' '%s' '%s' fetch latest commit failure \n", sort, info, tracking)
 	return ""
@@ -529,7 +548,84 @@ func abort(action string, commit string) {
 	}
 }
 
-func cleanTag(tracking Tracking) {
+func needCleanTag(tracking Tracking, ignore string) {
+	illegalTags := fetchProjectTags(tracking, ignore)
+
+	fmt.Println("\n\nThese illegal tags was suggested clean:")
+	for _, tag := range illegalTags {
+		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit)
+	}
+}
+
+func fetchProjectTags(tracking Tracking, ignore string) []Tag {
+
+	var tagsResult string
+	if tracking == All {
+		localArray := fetchProjectTags(Local, ignore)
+		remoteArray := fetchProjectTags(Remote, ignore)
+		return append(localArray, remoteArray...)
+	} else if tracking == Local {
+		_, resp := excute("git tag -l", false)
+		tagsResult = resp
+	} else if tracking == Remote {
+		_, resp := excute("git ls-remote --tags", false)
+		tagsResult = resp
+	}
+	return splitTag(tagsResult, tracking, ignore)
+}
+
+func splitTag(result string, tracking Tracking, ignore string) []Tag {
+	//追加保护tag config.tagRule
+	// ignore = ignore + "|" + config.tagRule
+	var resultTags []Tag
+	resultArray := strings.Split(result, "\n")
+	for _, info := range resultArray {
+		if tracking == Remote {
+			if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
+				list := strings.Split(info, "refs/tags/")
+				commit := strings.Trim(strings.Replace(list[0], " ", "", -1), " ")
+				tag := list[len(list)-1]
+				remoteTag := "refs/tags/" + tag
+				if checkTagLegal(tag) == false {
+
+					reg := regexp.MustCompile(ignore)
+					resutl := reg.FindString(tag)
+					if resutl == tag {
+						fmt.Printf("ignore tag (%s %s %s)", tracking, tag, commit)
+						continue
+					}
+
+					resultTags = append(resultTags, Tag{
+						Name:     remoteTag,
+						Tracking: tracking,
+						State:    Suggest,
+						Commit:   commit,
+					})
+				}
+			}
+		} else if tracking == Local {
+			lacalTag := info
+			if checkTagLegal(lacalTag) == false {
+				commit := fetchLatestCommit("tag", lacalTag, tracking)
+				reg := regexp.MustCompile(ignore)
+				resutl := reg.FindString(lacalTag)
+				if resutl == lacalTag {
+					fmt.Printf("ignore tag (%s %s %s)", tracking, lacalTag, commit)
+					continue
+				}
+				resultTags = append(resultTags, Tag{
+					Name:     lacalTag,
+					Tracking: tracking,
+					State:    Suggest,
+					Commit:   commit,
+				})
+			}
+		}
+	}
+	return resultTags
+}
+
+func cleanTag(tracking Tracking, ignore string) {
 	fmt.Println("archive clean tags nothing")
 	return
 	// git tag -d 0.0.1 //删除本地tag
@@ -650,7 +746,7 @@ func needCleanBranch(tracking Tracking, ignore string) {
 	fmt.Println("\n\nThese merged branches was suggested clean:")
 	for _, branch := range mergedBranches {
 		if branch.State == Merged {
-			fmt.Printf("  %s %s %s \n", tracking, branch.Name, branch.Commit)
+			fmt.Printf("  %s %s %s \n", branch.Tracking, branch.Name, branch.Commit)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
 		}
@@ -659,7 +755,7 @@ func needCleanBranch(tracking Tracking, ignore string) {
 	fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
 	for _, branch := range oldestBranches {
 		if branch.State == Oldest {
-			fmt.Printf("  %s %s %s %s\n", tracking, branch.Name, branch.Commit, branch.Desc)
+			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.Desc)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
 		}
@@ -1011,13 +1107,19 @@ func updateVersion() {
 }
 
 func test(target string, vtag string) {
+
+	needCleanTag(All, "")
+
 	// updateVersion()
 	// checkTagLegal(vtag)
+	// success, commitInfo := excute("git show "+"v0.0.8", true)
+	// if success {
+	// 	reg := regexp.MustCompile(`commit [\w]+`)
+	// 	resutl := reg.FindString(commitInfo)
+	// 	resutl = strings.Replace(resutl, "commit ", "", -1)
+	// 	fmt.Println(resutl)
+	// }
 
-	text := "feature/v9.4.1"
-	reg := regexp.MustCompile(target)
-	resutl := reg.FindString(text)
-	fmt.Println(resutl)
 }
 
 // String value for traking
