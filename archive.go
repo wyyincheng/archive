@@ -55,9 +55,6 @@ func buildCLI() {
 			return nil
 		}
 
-		fmt.Println("archive -h 查看已开放功能")
-		return nil
-
 		target := c.String("into")
 		vtag := c.String("t")
 		if len(vtag) > 0 {
@@ -132,30 +129,30 @@ func buildCLI() {
 				return nil
 			},
 			Flags: []cli.Flag{
-				// &cli.BoolFlag{
-				// 	Name:    "all",
-				// 	Aliases: []string{"a"},
-				// 	Value:   false,
-				// 	Usage:   "clean all branches which been merged",
-				// },
-				// &cli.BoolFlag{
-				// 	Name:    "remote",
-				// 	Aliases: []string{"r"},
-				// 	Value:   false,
-				// 	Usage:   "clean remote branches which been merged",
-				// },
-				// &cli.BoolFlag{
-				// 	Name:    "local",
-				// 	Aliases: []string{"l"},
-				// 	Value:   false,
-				// 	Usage:   "clean local branches which been merged",
-				// },
-				// &cli.BoolFlag{
-				// 	Name:    "suggest",
-				// 	Aliases: []string{"s"},
-				// 	Value:   false,
-				// 	Usage:   "show branches which been merged without clean",
-				// },
+				&cli.BoolFlag{
+					Name:    "all",
+					Aliases: []string{"a"},
+					Value:   false,
+					Usage:   "clean all branches which been merged",
+				},
+				&cli.BoolFlag{
+					Name:    "remote",
+					Aliases: []string{"r"},
+					Value:   false,
+					Usage:   "clean remote branches which been merged",
+				},
+				&cli.BoolFlag{
+					Name:    "local",
+					Aliases: []string{"l"},
+					Value:   false,
+					Usage:   "clean local branches which been merged",
+				},
+				&cli.BoolFlag{
+					Name:    "suggest",
+					Aliases: []string{"s"},
+					Value:   false,
+					Usage:   "show branches which been merged without clean",
+				},
 				&cli.StringFlag{
 					Name:    "ignore",
 					Aliases: []string{"i"},
@@ -259,6 +256,7 @@ func buildCLI() {
 							return nil
 						}
 
+						readyArchive()
 						if c.Bool("a") {
 							cleanTag(All, ignore)
 							return nil
@@ -271,6 +269,10 @@ func buildCLI() {
 							cleanTag(Local, ignore)
 							return nil
 						}
+						excute("git fetch", false)
+						excute("git pull", true)
+						cleanTag(tracking, ignore)
+						saveArchive(archiveInfo)
 						return nil
 					},
 					Flags: []cli.Flag{
@@ -291,6 +293,17 @@ func buildCLI() {
 							Aliases: []string{"l"},
 							Value:   false,
 							Usage:   "clean local branches which been merged",
+						},
+						&cli.BoolFlag{
+							Name:    "suggest",
+							Aliases: []string{"s"},
+							Value:   false,
+							Usage:   "show branches which been merged without clean",
+						},
+						&cli.StringFlag{
+							Name:    "ignore",
+							Aliases: []string{"i"},
+							Usage:   "ignore branches which been merged without clean. eg: archive clean branch -i \"feature\\/v[0-9]+.[0-9]+.[0-9]+|master|feature/1.0.0/publish\"",
 						},
 					},
 				},
@@ -551,7 +564,9 @@ func abort(action string, commit string) {
 func needCleanTag(tracking Tracking, ignore string) {
 	illegalTags := fetchProjectTags(tracking, ignore)
 
-	fmt.Println("\n\nThese illegal tags was suggested clean:")
+	if len(illegalTags) > 0 {
+		fmt.Println("\n\nThese illegal tags was suggested clean:")
+	}
 	for _, tag := range illegalTags {
 		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit)
 	}
@@ -591,7 +606,7 @@ func splitTag(result string, tracking Tracking, ignore string) []Tag {
 					reg := regexp.MustCompile(ignore)
 					resutl := reg.FindString(tag)
 					if resutl == tag {
-						fmt.Printf("ignore tag (%s %s %s)", tracking, tag, commit)
+						fmt.Printf("ignore tag (%s %s %s)\n", tracking, tag, commit)
 						continue
 					}
 
@@ -743,7 +758,9 @@ func needCleanBranch(tracking Tracking, ignore string) {
 	oldestBranches := oldestBranches(tracking, ignore)
 	// suggestCleanBranches := append(mergedBranches, oldestBranches...)
 
-	fmt.Println("\n\nThese merged branches was suggested clean:")
+	if len(mergedBranches) > 0 {
+		fmt.Println("\n\nThese merged branches was suggested clean:")
+	}
 	for _, branch := range mergedBranches {
 		if branch.State == Merged {
 			fmt.Printf("  %s %s %s \n", branch.Tracking, branch.Name, branch.Commit)
@@ -752,7 +769,9 @@ func needCleanBranch(tracking Tracking, ignore string) {
 		}
 	}
 
-	fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
+	if len(oldestBranches) > 0 {
+		fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
+	}
 	for _, branch := range oldestBranches {
 		if branch.State == Oldest {
 			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.Desc)
