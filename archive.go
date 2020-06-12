@@ -173,34 +173,29 @@ func buildCLI() {
 							tracking = Local
 						}
 
+						excute("git fetch", false)
 						if clean == false {
 							needCleanBranch(tracking, ignore)
 							return nil
 						}
 
+						readyArchive()
 						if c.Bool("a") {
-							readyArchive()
-							excute("git fetch", false)
 							cleanBranch(All, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
-							readyArchive()
-							excute("git fetch", false)
 							cleanBranch(Remote, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
-							readyArchive()
-							excute("git fetch", false)
 							cleanBranch(Local, clean, ignore)
 							saveArchive(archiveInfo)
 							return nil
 						}
-						readyArchive()
-						excute("git fetch", false)
+
 						cleanBranch(All, clean, ignore)
 						saveArchive(archiveInfo)
 						return nil
@@ -251,26 +246,29 @@ func buildCLI() {
 							tracking = Local
 						}
 
+						excute("git fetch", false)
 						if clean == false {
-							needCleanTag(tracking, ignore)
+							showIllegalTags(tracking, ignore)
 							return nil
 						}
 
 						readyArchive()
+						excute("git pull", true)
 						if c.Bool("a") {
 							cleanTag(All, ignore)
+							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("r") {
 							cleanTag(Remote, ignore)
+							saveArchive(archiveInfo)
 							return nil
 						}
 						if c.Bool("l") {
 							cleanTag(Local, ignore)
+							saveArchive(archiveInfo)
 							return nil
 						}
-						excute("git fetch", false)
-						excute("git pull", true)
 						cleanTag(tracking, ignore)
 						saveArchive(archiveInfo)
 						return nil
@@ -561,15 +559,8 @@ func abort(action string, commit string) {
 	}
 }
 
-func needCleanTag(tracking Tracking, ignore string) {
-	illegalTags := fetchProjectTags(tracking, ignore)
-
-	if len(illegalTags) > 0 {
-		fmt.Println("\n\nThese illegal tags was suggested clean:")
-	}
-	for _, tag := range illegalTags {
-		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit)
-	}
+func needCleanTag(tracking Tracking, ignore string) []Tag {
+	return fetchProjectTags(tracking, ignore)
 }
 
 func fetchProjectTags(tracking Tracking, ignore string) []Tag {
@@ -640,36 +631,24 @@ func splitTag(result string, tracking Tracking, ignore string) []Tag {
 	return resultTags
 }
 
+func showIllegalTags(tracking Tracking, ignore string) {
+	illegalTags := needCleanTag(tracking, ignore)
+	if len(illegalTags) > 0 {
+		fmt.Println("\n\nThese illegal tags was suggested clean:")
+	} else {
+		fmt.Println("\n\nGood, every tag is legal.")
+	}
+	for _, tag := range illegalTags {
+		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit)
+	}
+}
+
 func cleanTag(tracking Tracking, ignore string) {
-	fmt.Println("archive clean tags nothing")
-	return
 	// git tag -d 0.0.1 //删除本地tag
 	// git push origin :refs/tags/0.0.1 //删除远程tag
-
-	_, resp := excute("git ls-remote --tags", false)
-	tags := strings.Split(resp, "\n")
-	for _, info := range tags {
-		if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
-			list := strings.Split(info, "refs/tags/")
-			commit := strings.Trim(strings.Replace(list[0], " ", "", -1), " ")
-			remoteTag := "refs/tags/" + list[len(list)-1]
-			if checkTagLegal(list[len(list)-1]) == false {
-				var state State
-				if config.TagClean == Clean {
-					state = Delete
-					deleteTag(remoteTag, tracking)
-				} else {
-					state = Suggest
-					fmt.Printf("  suggest clean tag(%s %s) : \n", tracking, remoteTag)
-				}
-				archiveInfo.Tags = append(archiveInfo.Tags, Tag{
-					Name:     remoteTag,
-					Tracking: tracking,
-					State:    state,
-					Commit:   commit,
-				})
-			}
-		}
+	tags := needCleanTag(tracking, ignore)
+	for _, tag := range tags {
+		deleteTag(tag)
 	}
 }
 
@@ -945,10 +924,27 @@ func deleteBranch(branch string, tracking Tracking, ignore string) State {
 	return success
 }
 
-func deleteTag(tag string, traking Tracking) {
-	fmt.Printf("  delete tag(%s %s) : \n", traking, tag)
-	excute("git tag -d "+strings.Replace(tag, "refs/tags/", "", -1), false)
-	excute("git push origin :"+tag, false)
+func deleteTag(tag Tag) {
+	var state State = Ignore
+	if tag.State != Ignore {
+		success, _ := excute("git tag -d "+strings.Replace(tag.Name, "refs/tags/", "", -1), false)
+		if success {
+			pSuccess, _ := excute("git push origin :"+tag.Name, false)
+			if pSuccess {
+				state = Delete
+			} else {
+				state = Error
+			}
+		} else {
+			state = Error
+		}
+	}
+	archiveInfo.Tags = append(archiveInfo.Tags, Tag{
+		Name:     tag.Name,
+		Tracking: tag.Tracking,
+		State:    state,
+		Commit:   tag.Commit,
+	})
 }
 
 func lock() {
@@ -1126,8 +1122,6 @@ func updateVersion() {
 }
 
 func test(target string, vtag string) {
-
-	needCleanTag(All, "")
 
 	// updateVersion()
 	// checkTagLegal(vtag)
