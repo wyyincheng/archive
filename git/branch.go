@@ -3,11 +3,59 @@ package git
 import (
 	"archive/tools"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 func init() {
 
+}
+
+// OldestBrnach 搜索大于指定天数未更新的分支列表，并按正则过滤
+func OldestBrnach(tracking Tracking, ignore string, day int) []*Branch {
+
+	var oldestResult string
+	var oldBranches []*Branch
+	if tracking == All {
+		localArray := OldestBrnach(Local, ignore, day)
+		remoteArray := OldestBrnach(Remote, ignore, day)
+		return append(localArray, remoteArray...)
+	} else if tracking == Local {
+		success, resp := tools.Excute("git branch")
+		if success == false {
+			return nil
+		}
+		oldestResult = resp
+	} else if tracking == Remote {
+		success, resp := tools.Excute("git branch -r")
+		if success == false {
+			return nil
+		}
+		oldestResult = resp
+	}
+	branches := splitBranch(oldestResult, tracking, ignore, Oldest)
+	for _, branch := range branches {
+		_, ctStr := tools.Excute("git log --pretty=format:“%ct” " + branch.Commit + " -1")
+		ctStr = strings.Replace(ctStr, "“", "", -1)
+		ctStr = strings.Replace(ctStr, "”", "", -1)
+		//TODO: 数字提取正则
+		ct, err := strconv.ParseInt(ctStr, 10, 64)
+		if err == nil && tools.CheckOutDay(ct, day) {
+			branch.LastDate = tools.String(ct)
+			//以下分支超两周未更新，建议确认后清理
+			// fmt.Printf("oldest branch(%s %s %s) : \n", tracking, branch.Name, branch.Commit)
+			_, auth := tools.Excute("git log --pretty=format:“%aN” " + branch.Commit + " -1")
+			auth = strings.Replace(auth, "“", "", -1)
+			auth = strings.Replace(auth, "”", "", -1)
+			// _, email := excute("git log --pretty=format:“%ae” "+branch.Commit+" -1", false)
+			// email = strings.Replace(email, "“", "", -1)
+			// email = strings.Replace(email, "”", "", -1)
+			// branch.Desc = "Auth:" + auth + " Email:" + email
+			branch.Desc = "@" + auth
+			oldBranches = append(oldBranches, branch)
+		}
+	}
+	return oldBranches
 }
 
 // MergedBranch 按正则过滤后的已合并分支列表
@@ -136,4 +184,5 @@ type Branch struct {
 	State    State
 	Desc     string
 	Remote   string
+	LastDate string
 }
