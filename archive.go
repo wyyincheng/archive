@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/git"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -124,9 +125,9 @@ func buildCLI() {
 				ignore := c.String("i")
 				readyArchive("clean_all")
 				fmt.Println("\n🛠start clean tags.")
-				cleanTag(All, ignore)
+				cleanTag(git.All, ignore)
 				fmt.Println("\n🛠start clean branches.")
-				cleanBranch(All, config.BranchClean == Clean, ignore)
+				cleanBranch(git.All, config.BranchClean == Clean, ignore)
 				saveArchive()
 				return nil
 			},
@@ -168,11 +169,11 @@ func buildCLI() {
 					Action: func(c *cli.Context) error {
 						ignore := c.String("i")
 						clean := !c.Bool("s")
-						var tracking Tracking = All
+						var tracking git.Tracking = git.All
 						if c.Bool("r") {
-							tracking = Remote
+							tracking = git.Remote
 						} else if c.Bool("l") {
-							tracking = Local
+							tracking = git.Local
 						}
 
 						excute("git fetch", false)
@@ -183,22 +184,22 @@ func buildCLI() {
 
 						readyArchive("clean_branch")
 						if c.Bool("a") {
-							cleanBranch(All, clean, ignore)
+							cleanBranch(git.All, clean, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("r") {
-							cleanBranch(Remote, clean, ignore)
+							cleanBranch(git.Remote, clean, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("l") {
-							cleanBranch(Local, clean, ignore)
+							cleanBranch(git.Local, clean, ignore)
 							saveArchive()
 							return nil
 						}
 
-						cleanBranch(All, clean, ignore)
+						cleanBranch(git.All, clean, ignore)
 						saveArchive()
 						return nil
 					},
@@ -241,11 +242,11 @@ func buildCLI() {
 
 						ignore := c.String("i")
 						clean := !c.Bool("s")
-						var tracking Tracking = All
+						var tracking git.Tracking = git.All
 						if c.Bool("r") {
-							tracking = Remote
+							tracking = git.Remote
 						} else if c.Bool("l") {
-							tracking = Local
+							tracking = git.Local
 						}
 
 						excute("git fetch", false)
@@ -257,17 +258,17 @@ func buildCLI() {
 						readyArchive("clean_tag")
 						excute("git pull", true)
 						if c.Bool("a") {
-							cleanTag(All, ignore)
+							cleanTag(git.All, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("r") {
-							cleanTag(Remote, ignore)
+							cleanTag(git.Remote, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("l") {
-							cleanTag(Local, ignore)
+							cleanTag(git.Local, ignore)
 							saveArchive()
 							return nil
 						}
@@ -415,8 +416,8 @@ func archive(target string, vtag string) {
 			return
 		}
 		publishTag(target, vtag)
-		cleanTag(All, "")
-		cleanBranch(All, config.BranchClean == Clean, "")
+		cleanTag(git.All, "")
+		cleanBranch(git.All, config.BranchClean == Clean, "")
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 		updateVersion()
 		return
@@ -469,15 +470,15 @@ func merge(target string, vtag string) bool {
 		excute("git fetch", false)
 		excute("git checkout "+target, false)
 		excute("git pull", false)
-		archiveInfo.Commit = fetchLatestCommit("branch", target, Local)
+		archiveInfo.Commit = fetchLatestCommit("branch", target, git.Local)
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
-			archiveInfo.Branches = append(archiveInfo.Branches, Branch{
+			archiveInfo.Branches = append(archiveInfo.Branches, git.Branch{
 				Name:     branch,
-				Tracking: Remote,
-				State:    Merged,
-				Commit:   fetchLatestCommit("branch", branch, Remote),
+				Tracking: git.Remote,
+				State:    git.Merged,
+				Commit:   fetchLatestCommit("branch", branch, git.Remote),
 			})
 			return true
 		}
@@ -508,17 +509,17 @@ func gitConfig(key string) string {
 	return config
 }
 
-func fetchLatestCommit(sort string, info string, tracking Tracking) string {
+func fetchLatestCommit(sort string, info string, tracking git.Tracking) string {
 	if sort == "branch" {
 
 		var success bool
 		var result string
 
-		if tracking == Remote {
+		if tracking == git.Remote {
 			status, resp := excute("git branch -r -v", false)
 			success = status
 			result = resp
-		} else if tracking == Local {
+		} else if tracking == git.Local {
 			status, resp := excute("git branch -v", false)
 			success = status
 			result = resp
@@ -560,34 +561,34 @@ func abort(action string, commit string) {
 	}
 }
 
-func needCleanTag(tracking Tracking, ignore string) []Tag {
+func needCleanTag(tracking git.Tracking, ignore string) []Tag {
 	return fetchProjectTags(tracking, ignore)
 }
 
-func fetchProjectTags(tracking Tracking, ignore string) []Tag {
+func fetchProjectTags(tracking git.Tracking, ignore string) []Tag {
 
 	var tagsResult string
-	if tracking == All {
-		localArray := fetchProjectTags(Local, ignore)
-		remoteArray := fetchProjectTags(Remote, ignore)
+	if tracking == git.All {
+		localArray := fetchProjectTags(git.Local, ignore)
+		remoteArray := fetchProjectTags(git.Remote, ignore)
 		return append(localArray, remoteArray...)
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 		_, resp := excute("git tag -l", false)
 		tagsResult = resp
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		_, resp := excute("git ls-remote --tags", false)
 		tagsResult = resp
 	}
 	return splitTag(tagsResult, tracking, ignore)
 }
 
-func splitTag(result string, tracking Tracking, ignore string) []Tag {
+func splitTag(result string, tracking git.Tracking, ignore string) []Tag {
 	//追加保护tag config.tagRule
 	// ignore = ignore + "|" + config.tagRule
 	var resultTags []Tag
 	resultArray := strings.Split(result, "\n")
 	for _, info := range resultArray {
-		if tracking == Remote {
+		if tracking == git.Remote {
 			if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
 				list := strings.Split(info, "refs/tags/")
 				commit := strings.Trim(strings.Replace(list[0], " ", "", -1), " ")
@@ -605,12 +606,12 @@ func splitTag(result string, tracking Tracking, ignore string) []Tag {
 					resultTags = append(resultTags, Tag{
 						Name:     remoteTag,
 						Tracking: tracking,
-						State:    Suggest,
+						State:    git.Suggest,
 						Commit:   commit,
 					})
 				}
 			}
-		} else if tracking == Local {
+		} else if tracking == git.Local {
 			lacalTag := info
 			if checkTagLegal(lacalTag) == false {
 				commit := fetchLatestCommit("tag", lacalTag, tracking)
@@ -623,7 +624,7 @@ func splitTag(result string, tracking Tracking, ignore string) []Tag {
 				resultTags = append(resultTags, Tag{
 					Name:     lacalTag,
 					Tracking: tracking,
-					State:    Suggest,
+					State:    git.Suggest,
 					Commit:   commit,
 				})
 			}
@@ -632,7 +633,7 @@ func splitTag(result string, tracking Tracking, ignore string) []Tag {
 	return resultTags
 }
 
-func showIllegalTags(tracking Tracking, ignore string) {
+func showIllegalTags(tracking git.Tracking, ignore string) {
 	illegalTags := needCleanTag(tracking, ignore)
 	if len(illegalTags) > 0 {
 		fmt.Println("\n\nThese illegal tags was suggested clean:")
@@ -644,7 +645,7 @@ func showIllegalTags(tracking Tracking, ignore string) {
 	}
 }
 
-func cleanTag(tracking Tracking, ignore string) {
+func cleanTag(tracking git.Tracking, ignore string) {
 	// git tag -d 0.0.1 //删除本地tag
 	// git push origin :refs/tags/0.0.1 //删除远程tag
 	tags := needCleanTag(tracking, ignore)
@@ -653,7 +654,7 @@ func cleanTag(tracking Tracking, ignore string) {
 	}
 }
 
-func cleanBranch(tracking Tracking, clean bool, ignore string) {
+func cleanBranch(tracking git.Tracking, clean bool, ignore string) {
 
 	// 当前分支及对应远程分支保留
 
@@ -672,14 +673,14 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 
 	var result string
 
-	if tracking == All {
-		cleanBranch(Local, clean, ignore)
-		cleanBranch(Remote, clean, ignore)
+	if tracking == git.All {
+		cleanBranch(git.Local, clean, ignore)
+		cleanBranch(git.Remote, clean, ignore)
 		return
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 		_, resp := excute("git branch --merged", false)
 		result = resp
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		_, resp := excute("git branch -r --merged", false)
 		result = resp
 	}
@@ -697,16 +698,16 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 		// if config.DefaultBranch.contains(branch) {
 		// continue
 		// }
-		var state State
+		var state git.State
 		if clean == true {
-			state = Delete
+			state = git.Delete
 			success := deleteBranch(branch, tracking, ignore)
-			if success == Ignore {
+			if success == git.Ignore {
 				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
 				continue
 			}
-			if success == Error {
-				state = Error
+			if success == git.Error {
+				state = git.Error
 			}
 		} else {
 			logger.Printf("cleanBranch error logic. (%s %s %s) : \n", tracking, branch, commit)
@@ -722,7 +723,7 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 			// logger.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
 		}
 
-		archiveInfo.Branches = append(archiveInfo.Branches, Branch{
+		archiveInfo.Branches = append(archiveInfo.Branches, git.Branch{
 			Name:     branch,
 			Tracking: tracking,
 			State:    state,
@@ -732,7 +733,8 @@ func cleanBranch(tracking Tracking, clean bool, ignore string) {
 }
 
 // 分支清理后再扫描一遍，看下有没有时间过久的分支，提示用户清理掉
-func needCleanBranch(tracking Tracking, ignore string) {
+func needCleanBranch(tracking git.Tracking, ignore string) {
+
 
 	mergedBranches := mergedBranches(tracking, ignore)
 	oldestBranches := oldestBranches(tracking, ignore)
@@ -742,7 +744,7 @@ func needCleanBranch(tracking Tracking, ignore string) {
 		fmt.Println("\n\nThese merged branches was suggested clean:")
 	}
 	for _, branch := range mergedBranches {
-		if branch.State == Merged {
+		if branch.State == git.Merged {
 			fmt.Printf("  %s %s %s \n", branch.Tracking, branch.Name, branch.Commit)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
@@ -753,7 +755,7 @@ func needCleanBranch(tracking Tracking, ignore string) {
 		fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
 	}
 	for _, branch := range oldestBranches {
-		if branch.State == Oldest {
+		if branch.State == git.Oldest {
 			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.Desc)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
@@ -761,37 +763,37 @@ func needCleanBranch(tracking Tracking, ignore string) {
 	}
 }
 
-func mergedBranches(tracking Tracking, ignore string) []Branch {
+func mergedBranches(tracking git.Tracking, ignore string) []git.Branch {
 	var mergedResult string
-	if tracking == All {
-		localArray := mergedBranches(Local, ignore)
-		remoteArray := mergedBranches(Remote, ignore)
+	if tracking == git.All {
+		localArray := mergedBranches(git.Local, ignore)
+		remoteArray := mergedBranches(git.Remote, ignore)
 		return append(localArray, remoteArray...)
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 		_, resp := excute("git branch --merged", false)
 		mergedResult = resp
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		_, resp := excute("git branch -r --merged", false)
 		mergedResult = resp
 	}
-	return splitBranch(mergedResult, tracking, ignore, Merged)
+	return splitBranch(mergedResult, tracking, ignore, git.Merged)
 }
 
-func oldestBranches(tracking Tracking, ignore string) []Branch {
+func oldestBranches(tracking git.Tracking, ignore string) []git.Branch {
 	var oldestResult string
-	var oldBranches []Branch
-	if tracking == All {
-		localArray := oldestBranches(Local, ignore)
-		remoteArray := oldestBranches(Remote, ignore)
+	var oldBranches []git.Branch
+	if tracking == git.All {
+		localArray := oldestBranches(git.Local, ignore)
+		remoteArray := oldestBranches(git.Remote, ignore)
 		return append(localArray, remoteArray...)
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 		_, resp := excute("git branch", false)
 		oldestResult = resp
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		_, resp := excute("git branch -r", false)
 		oldestResult = resp
 	}
-	branches := splitBranch(oldestResult, tracking, ignore, Oldest)
+	branches := splitBranch(oldestResult, tracking, ignore, git.Oldest)
 	for _, branch := range branches {
 		_, ctStr := excute("git log --pretty=format:“%ct” "+branch.Commit+" -1", false)
 		ctStr = strings.Replace(ctStr, "“", "", -1)
@@ -822,10 +824,10 @@ func checkOutDate(ct int64, gap float64) bool {
 	return diff > gap
 }
 
-func splitBranch(result string, tracking Tracking, ignore string, state State) []Branch {
+func splitBranch(result string, tracking git.Tracking, ignore string, state git.State) []git.Branch {
 	//追加默认分支、保护分支
 	ignore = ignore + "|master"
-	var resultBranches []Branch
+	var resultBranches []git.Branch
 	resultArray := strings.Split(result, "\n")
 	for _, info := range resultArray {
 		trimStr := strings.Trim(info, " ")
@@ -837,13 +839,13 @@ func splitBranch(result string, tracking Tracking, ignore string, state State) [
 
 		commit := fetchLatestCommit("branch", branch, tracking)
 		result, _, _ := checkBranch(branch, tracking, ignore)
-		if result == Ignore {
+		if result == git.Ignore {
 			// fmt.Printf("splitBranch ignore branch(%s %s %s) : \n", tracking, branch, commit)
 			// logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
 			continue
 		}
 
-		resultBranches = append(resultBranches, Branch{
+		resultBranches = append(resultBranches, git.Branch{
 			Name:     branch,
 			Tracking: tracking,
 			State:    state,
@@ -853,21 +855,21 @@ func splitBranch(result string, tracking Tracking, ignore string, state State) [
 	return resultBranches
 }
 
-func checkBranch(branch string, tracking Tracking, ignore string) (State, string, string) {
-	var success = Suggest
+func checkBranch(branch string, tracking git.Tracking, ignore string) (git.State, string, string) {
+	var success = git.Suggest
 	var remote = ""
 	var name = branch
-	if tracking == All {
+	if tracking == git.All {
 		saveArchive()
 		logger.Fatalf("check branch error: (%s %s)\n", tracking, branch)
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 
 		reg := regexp.MustCompile(ignore)
 		resutl := reg.FindString(branch)
 		if resutl == name {
-			return Ignore, remote, name
+			return git.Ignore, remote, name
 		}
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		reg := regexp.MustCompile(`[\w]+`)
 		remote = reg.FindString(branch)
 		name = strings.Replace(branch, remote+"/", "", 1)
@@ -875,35 +877,35 @@ func checkBranch(branch string, tracking Tracking, ignore string) (State, string
 		breg := regexp.MustCompile(ignore)
 		resutl := breg.FindString(name)
 		if resutl == name {
-			return Ignore, remote, name
+			return git.Ignore, remote, name
 		}
 	}
 	return success, remote, name
 }
 
-func deleteBranch(branch string, tracking Tracking, ignore string) State {
-	var success = Error
-	if tracking == All {
+func deleteBranch(branch string, tracking git.Tracking, ignore string) git.State {
+	var success = git.Error
+	if tracking == git.All {
 		saveArchive()
 		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
-	} else if tracking == Local {
+	} else if tracking == git.Local {
 
 		reg := regexp.MustCompile(ignore)
 		resutl := reg.FindString(branch)
 		if resutl == branch {
 			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
-			return Ignore
+			return git.Ignore
 		}
 
 		reuslt, _ := excute("git branch -d "+branch, true)
 		if reuslt == true {
 			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
-			success = Success
+			success = git.Success
 		} else {
 			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
-			success = Error
+			success = git.Error
 		}
-	} else if tracking == Remote {
+	} else if tracking == git.Remote {
 		reg := regexp.MustCompile(`[\w]+`)
 		remote := reg.FindString(branch)
 		name := strings.Replace(branch, remote+"/", "", 1)
@@ -912,34 +914,34 @@ func deleteBranch(branch string, tracking Tracking, ignore string) State {
 		resutl := breg.FindString(name)
 		if resutl == name {
 			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
-			return Ignore
+			return git.Ignore
 		}
 
 		reuslt, _ := excute("git push "+remote+" --delete "+name, true)
 		if reuslt == true {
 			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
-			success = Success
+			success = git.Success
 		} else {
 			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
-			success = Error
+			success = git.Error
 		}
 	}
 	return success
 }
 
 func deleteTag(tag Tag) {
-	var state State = Ignore
-	if tag.State != Ignore {
+	var state git.State = git.Ignore
+	if tag.State != git.Ignore {
 		success, _ := excute("git tag -d "+strings.Replace(tag.Name, "refs/tags/", "", -1), false)
 		if success {
 			pSuccess, _ := excute("git push origin :"+tag.Name, false)
 			if pSuccess {
-				state = Delete
+				state = git.Delete
 			} else {
-				state = Error
+				state = git.Error
 			}
 		} else {
-			state = Error
+			state = git.Error
 		}
 	}
 	archiveInfo.Tags = append(archiveInfo.Tags, Tag{
@@ -1144,13 +1146,13 @@ func test(target string, vtag string) {
 }
 
 // String value for traking
-func String(traking Tracking) string {
+func String(traking git.Tracking) string {
 	switch traking {
-	case All:
+	case git.All:
 		return "All"
-	case Local:
+	case git.Local:
 		return "Local"
-	case Remote:
+	case git.Remote:
 		return "Remote"
 	default:
 		return "Unkonw"
@@ -1176,54 +1178,20 @@ type Archive struct {
 	Commit   string
 	User     string
 	Email    string
-	Branches []Branch
+	Branches []git.Branch
 	Tags     []Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
 	Log      string
 }
 
-//Branch 分支信息
-type Branch struct {
-	Name     string
-	Commit   string
-	Tracking Tracking
-	State    State
-	Desc     string
-}
-
 //Tag tag信息
 type Tag struct {
 	Name     string
 	Commit   string
-	Tracking Tracking
-	State    State
+	Tracking git.Tracking
+	State    git.State
 }
-
-// Tracking type
-type Tracking string
-
-// tracking type
-const (
-	All    Tracking = "All"
-	Local  Tracking = "Local"
-	Remote Tracking = "Remote"
-)
-
-// State branch state
-type State string
-
-// 分支状态
-const (
-	Merged  State = "Merged"
-	Delete  State = "Delete"
-	Suggest State = "Suggest"
-	Abort   State = "Abort"
-	Error   State = "Error"
-	Ignore  State = "Ignore"
-	Success State = "Success"
-	Oldest  State = "Oldest"
-)
 
 // Frequency check update frequency
 type Frequency string
