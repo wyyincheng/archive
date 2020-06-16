@@ -14,7 +14,7 @@ func CheckOutDay(ct int64, day int) bool {
 }
 
 // String Jan _2 15:04:05 2006
-func String(ct int64) string {
-	tm := time.Unix(ct, 0)
-	return tm.Format("Jan _2 15:04:05 2006")
+func String(unix int64) string {
+	tm := time.Unix(unix, 0)
+	return tm.Format("2006-01-02 15:04:05")
 }
