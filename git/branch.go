@@ -100,6 +100,7 @@ func splitBranch(result string, tracking Tracking, ignore string, state State) [
 			// 		// logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
 			continue
 		}
+		branch.State = state
 		branch = fetchLatestCommit(branch)
 		if branch != nil {
 			resultBranches = append(resultBranches, branch)
@@ -127,8 +128,12 @@ func fetchLatestCommit(branch *Branch) *Branch {
 		commitInfos := strings.Split(result, "\n")
 		for _, commit := range commitInfos {
 			trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
-			if strings.HasPrefix(trimStr, branch.Name) {
-				infos := strings.Replace(trimStr, branch.Name+" ", "", 1)
+			var name = branch.Name
+			if branch.Tracking == Remote {
+				name = branch.Remote + "/" + branch.Name
+			}
+			if strings.HasPrefix(trimStr, name) {
+				infos := strings.Replace(trimStr, name+" ", "", 1)
 				reg := regexp.MustCompile(`[\w]+`)
 				cmt := reg.FindString(infos)
 				// logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
