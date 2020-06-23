@@ -2,6 +2,7 @@ package git
 
 import (
 	"archive/tools"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -9,6 +10,34 @@ import (
 
 func init() {
 
+}
+
+// Delete 删除指定分支
+func Delete(branch *Branch) *Branch {
+	if branch.Tracking == Local {
+		reuslt, _ := tools.Excute("git branch -d " + branch.Name)
+		if reuslt == true {
+			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.State = Deleted
+		} else {
+			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.State = Error
+		}
+	} else if branch.Tracking == Remote {
+		reuslt, _ := tools.Excute("git push " + branch.Remote + " --delete " + branch.Name)
+		if reuslt == true {
+			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.State = Deleted
+		} else {
+			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.State = Error
+		}
+	} else {
+		// logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
+		fmt.Printf("  delete branch error(%s %s) : \n", branch.Tracking, branch.Name)
+		branch.State = Error
+	}
+	return branch
 }
 
 // OldestBrnach 搜索大于指定天数未更新的分支列表，并按正则过滤

@@ -700,7 +700,7 @@ func cleanBranch(tracking git.Tracking, clean bool, ignore string) {
 		// }
 		var state git.State
 		if clean == true {
-			state = git.Delete
+			state = git.Deleted
 			success := deleteBranch(branch, tracking, ignore)
 			if success == git.Ignore {
 				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
@@ -734,7 +734,6 @@ func cleanBranch(tracking git.Tracking, clean bool, ignore string) {
 
 // 分支清理后再扫描一遍，看下有没有时间过久的分支，提示用户清理掉
 func needCleanBranch(tracking git.Tracking, ignore string) {
-
 
 	mergedBranches := mergedBranches(tracking, ignore)
 	oldestBranches := oldestBranches(tracking, ignore)
@@ -936,7 +935,7 @@ func deleteTag(tag Tag) {
 		if success {
 			pSuccess, _ := excute("git push origin :"+tag.Name, false)
 			if pSuccess {
-				state = git.Delete
+				state = git.Deleted
 			} else {
 				state = git.Error
 			}

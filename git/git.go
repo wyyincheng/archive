@@ -20,7 +20,7 @@ type State string
 // 分支状态
 const (
 	Merged  State = "Merged"
-	Delete  State = "Delete"
+	Deleted State = "Deleted"
 	Suggest State = "Suggest"
 	Abort   State = "Abort"
 	Error   State = "Error"
