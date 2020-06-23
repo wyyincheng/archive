@@ -12,29 +12,58 @@ func init() {
 
 }
 
+// DelteBranch 删除一组分支
+func DelteBranch(list []*Branch) []*Branch {
+	var deltedList []*Branch
+	for _, branch := range list {
+		deleted := Delete(branch)
+		deltedList = append(deltedList, deleted)
+	}
+	return deltedList
+}
+
 // Delete 删除指定分支
 func Delete(branch *Branch) *Branch {
+
+	//当前分支无法被删除
+	result, current := tools.Excute("git symbolic-ref --short -q HEAD")
+	if result == false {
+		branch.Desc = "Identify Current Branch Failure."
+		branch.State = Error
+		return branch
+	}
+	current = strings.Replace(current, "\n", "", -1)
+	current = strings.Replace(current, " ", "", -1)
+	if current == branch.Name {
+		branch.Desc = "Ignore Current Branch"
+		branch.State = Ignore
+		return branch
+	}
+
 	if branch.Tracking == Local {
-		reuslt, _ := tools.Excute("git branch -d " + branch.Name)
+		reuslt, info := tools.Excute("git branch -d " + branch.Name)
 		if reuslt == true {
 			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
 			branch.State = Deleted
 		} else {
 			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.Desc = "Delete Failure:" + info
 			branch.State = Error
 		}
 	} else if branch.Tracking == Remote {
-		reuslt, _ := tools.Excute("git push " + branch.Remote + " --delete " + branch.Name)
+		reuslt, info := tools.Excute("git push " + branch.Remote + " --delete " + branch.Name)
 		if reuslt == true {
 			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
 			branch.State = Deleted
 		} else {
 			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			branch.Desc = "Delete Failure:" + info
 			branch.State = Error
 		}
 	} else {
 		// logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
 		fmt.Printf("  delete branch error(%s %s) : \n", branch.Tracking, branch.Name)
+		branch.Desc = "Miss Tracking"
 		branch.State = Error
 	}
 	return branch
