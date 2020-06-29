@@ -139,6 +139,29 @@ func MergedBranch(tracking Tracking, ignore string) []*Branch {
 	return splitBranch(mergedResult, tracking, ignore, Merged)
 }
 
+// AllBranch 按正则过滤后的所有分支
+func AllBranch(tracking Tracking, ignore string) []*Branch {
+	var result string
+	if tracking == All {
+		localArray := AllBranch(Local, ignore)
+		remoteArray := AllBranch(Remote, ignore)
+		return append(localArray, remoteArray...)
+	} else if tracking == Local {
+		success, resp := tools.Excute("git branch")
+		if success == false {
+			return nil
+		}
+		result = resp
+	} else if tracking == Remote {
+		success, resp := tools.Excute("git branch -r")
+		if success == false {
+			return nil
+		}
+		result = resp
+	}
+	return splitBranch(result, tracking, ignore, Default)
+}
+
 func splitBranch(result string, tracking Tracking, ignore string, state State) []*Branch {
 	// //追加默认分支、保护分支
 	// ignore = ignore + "|master"

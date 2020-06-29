@@ -19,6 +19,7 @@ type State string
 
 // 分支状态
 const (
+	Default State = "Default"
 	Merged  State = "Merged"
 	Deleted State = "Deleted"
 	Suggest State = "Suggest"

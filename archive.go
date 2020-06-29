@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/git"
+	"archive/tools"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -311,6 +312,56 @@ func buildCLI() {
 			},
 		},
 		{
+			Name:  "backup",
+			Usage: "backup branches or tags.",
+			Action: func(c *cli.Context) error {
+				ignore := c.String("i")
+				buildLogger("backup")
+				fmt.Println("\n🛠start backup tags.")
+				backupTag(git.All, ignore)
+				fmt.Println("\n🛠start clean branches.")
+				backupBranch(git.All, ignore)
+				saveArchive()
+				return nil
+			},
+			Subcommands: []*cli.Command{
+				{
+					Name:  "branch",
+					Usage: "backup branch",
+					Action: func(c *cli.Context) error {
+						ignore := c.String("i")
+						buildLogger("backup branch")
+						backupBranch(git.All, ignore)
+						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:    "ignore",
+							Aliases: []string{"i"},
+							Usage:   "ignore branches. eg: archive backup branch -i \"feature\\/v[0-9]+.[0-9]+.[0-9]+|master|feature/1.0.0/publish\"",
+						},
+					},
+				},
+				{
+					Name:  "tag",
+					Usage: "backup tag",
+					Action: func(c *cli.Context) error {
+						ignore := c.String("i")
+						buildLogger("backup tag")
+						backupTag(git.All, ignore)
+						return nil
+					},
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:    "ignore",
+							Aliases: []string{"i"},
+							Usage:   "ignore tags. eg: archive backup branch -i \"feature\\/v[0-9]+.[0-9]+.[0-9]+|master|feature/1.0.0/publish\"",
+						},
+					},
+				},
+			},
+		},
+		{
 			Name:  "abort",
 			Usage: "rollback archive which version you given",
 			Action: func(c *cli.Context) error {
@@ -363,6 +414,19 @@ func buildCLI() {
 
 	// sort.Sort(cli.FlagsByName(app.Flags))
 	// sort.Sort(cli.CommandsByName(app.Commands))
+
+}
+
+func backupBranch(tracking git.Tracking, ignore string) {
+	list := git.AllBranch(tracking, ignore)
+	logger.Printf("backup branch:%v\n", list)
+	infoJSON, _ := json.Marshal(list)
+	logger.Printf("backup branch json:%s\n", infoJSON)
+	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_branch.json")
+	write(infoJSON, backupPath)
+}
+
+func backupTag(tracking git.Tracking, ignore string) {
 
 }
 
@@ -1131,17 +1195,21 @@ func updateVersion() {
 }
 
 func test(target string, vtag string) {
-
-	// updateVersion()
-	// checkTagLegal(vtag)
-	// success, commitInfo := excute("git show "+"v0.0.8", true)
-	// if success {
-	// 	reg := regexp.MustCompile(`commit [\w]+`)
-	// 	resutl := reg.FindString(commitInfo)
-	// 	resutl = strings.Replace(resutl, "commit ", "", -1)
-	// 	fmt.Println(resutl)
+	// list := git.MergedBranch(git.All, "v([0-9]+\\.[0-9]+\\.[0-9])")
+	// list := git.OldestBrnach(git.Local, "master", 14)
+	// list := git.MergedBranch(git.Remote, "master")
+	// list = git.DelteBranch(list)
+	// for _, branch := range list {
+	// fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
 	// }
 
+	list := git.AllBranch(git.All, "v([0-9]+\\.[0-9]+\\.[0-9])")
+	for _, branch := range list {
+		fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
+	}
+
+	// commit := git.CommitForID("49701485c554926543bbeac506ddd33ac3849d06")
+	// fmt.Printf("commit: %s", commit.Commit)
 }
 
 // String value for traking
