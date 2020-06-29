@@ -125,10 +125,27 @@ func buildCLI() {
 			Action: func(c *cli.Context) error {
 				ignore := c.String("i")
 				readyArchive("clean_all")
+
+				excute("git fetch", false)
+
+				var tracking git.Tracking = git.All
+				if c.Bool("r") {
+					tracking = git.Remote
+				} else if c.Bool("l") {
+					tracking = git.Local
+				}
+
+				clean := !c.Bool("s")
+				if clean == false {
+					needCleanBranch(tracking, ignore)
+					needCleanTag(tracking, ignore)
+					return nil
+				}
+
 				fmt.Println("\n🛠start clean tags.")
-				cleanTag(git.All, ignore)
+				cleanTag(tracking, ignore)
 				fmt.Println("\n🛠start clean branches.")
-				cleanBranch(git.All, config.BranchClean == Clean, ignore)
+				cleanBranch(tracking, ignore)
 				saveArchive()
 				return nil
 			},
@@ -177,30 +194,30 @@ func buildCLI() {
 							tracking = git.Local
 						}
 
+						readyArchive("clean_branch")
 						excute("git fetch", false)
 						if clean == false {
 							needCleanBranch(tracking, ignore)
 							return nil
 						}
 
-						readyArchive("clean_branch")
 						if c.Bool("a") {
-							cleanBranch(git.All, clean, ignore)
+							cleanBranch(git.All, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("r") {
-							cleanBranch(git.Remote, clean, ignore)
+							cleanBranch(git.Remote, ignore)
 							saveArchive()
 							return nil
 						}
 						if c.Bool("l") {
-							cleanBranch(git.Local, clean, ignore)
+							cleanBranch(git.Local, ignore)
 							saveArchive()
 							return nil
 						}
 
-						cleanBranch(git.All, clean, ignore)
+						cleanBranch(git.All, ignore)
 						saveArchive()
 						return nil
 					},
@@ -250,13 +267,13 @@ func buildCLI() {
 							tracking = git.Local
 						}
 
+						readyArchive("clean_tag")
 						excute("git fetch", false)
 						if clean == false {
 							showIllegalTags(tracking, ignore)
 							return nil
 						}
 
-						readyArchive("clean_tag")
 						excute("git pull", true)
 						if c.Bool("a") {
 							cleanTag(git.All, ignore)
@@ -481,7 +498,7 @@ func archive(target string, vtag string) {
 		}
 		publishTag(target, vtag)
 		cleanTag(git.All, "")
-		cleanBranch(git.All, config.BranchClean == Clean, "")
+		cleanBranch(git.All, "")
 		fmt.Printf("Archive '%s' into '%s' success, see more info on:\nlog: '%s'\ninfo: '%s'\n", vtag, target, logPath, archivePath)
 		updateVersion()
 		return
@@ -718,95 +735,23 @@ func cleanTag(tracking git.Tracking, ignore string) {
 	}
 }
 
-func cleanBranch(tracking git.Tracking, clean bool, ignore string) {
-
-	// 当前分支及对应远程分支保留
-
-	/**
-	  TODO: 记录并跳过错误，继续后续流程
-	  2020/05/27 19:06:29 /Users/yc/Develop/Golang/GoShell/archive/archive.go:579: git push upstream --delete feature/1.0.0/publish
-	  2020/05/27 19:06:34 /Users/yc/Develop/Golang/GoShell/archive/archive.go:589: To https://github.com/wyyincheng/archive.git
-	   ! [remote rejected] feature/1.0.0/publish (refusing to delete the current branch: refs/heads/feature/1.0.0/publish)
-	  error: failed to push some refs to 'https://github.com/wyyincheng/archive.git'
-	*/
-
-	//指定分支，所有分支，本地分支，远程分支
-
-	// excute("git checkout -f", false)
-	// excute("git checkout master", false)
-
-	var result string
-
-	if tracking == git.All {
-		cleanBranch(git.Local, clean, ignore)
-		cleanBranch(git.Remote, clean, ignore)
-		return
-	} else if tracking == git.Local {
-		_, resp := excute("git branch --merged", false)
-		result = resp
-	} else if tracking == git.Remote {
-		_, resp := excute("git branch -r --merged", false)
-		result = resp
-	}
-
-	resultArray := strings.Split(result, "\n")
-	for _, info := range resultArray {
-		trimStr := strings.Trim(info, " ")
-		branchInfo := strings.Replace(trimStr, "*", "", -1)
-		branch := strings.Trim(branchInfo, " ")
-		if branch == "master" || branch == "origin/master" || len(branch) == 0 {
-			continue
-		}
-
-		commit := fetchLatestCommit("branch", branch, tracking)
-		// if config.DefaultBranch.contains(branch) {
-		// continue
-		// }
-		var state git.State
-		if clean == true {
-			state = git.Deleted
-			success := deleteBranch(branch, tracking, ignore)
-			if success == git.Ignore {
-				logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-				continue
-			}
-			if success == git.Error {
-				state = git.Error
-			}
-		} else {
-			logger.Printf("cleanBranch error logic. (%s %s %s) : \n", tracking, branch, commit)
-			// needCleanBranch(tracking,ignore)
-			// state = Suggest
-			// result, _, _ := checkBranch(branch, tracking, ignore)
-			// if result == Ignore {
-			// 	// fmt.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-			// 	logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-			// 	continue
-			// }
-			// fmt.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
-			// logger.Printf("  suggest clean branch(%s %s %s) : \n", tracking, branch, commit)
-		}
-
-		archiveInfo.Branches = append(archiveInfo.Branches, git.Branch{
-			Name:     branch,
-			Tracking: tracking,
-			State:    state,
-			Commit:   commit,
-		})
-	}
+func cleanBranch(tracking git.Tracking, ignore string) {
+	list := git.MergedBranch(tracking, ignore)
+	list = git.DelteBranch(list)
+	archiveInfo.Branches = list
 }
 
 // 分支清理后再扫描一遍，看下有没有时间过久的分支，提示用户清理掉
 func needCleanBranch(tracking git.Tracking, ignore string) {
 
-	mergedBranches := mergedBranches(tracking, ignore)
-	oldestBranches := oldestBranches(tracking, ignore)
-	// suggestCleanBranches := append(mergedBranches, oldestBranches...)
+	merged := git.MergedBranch(tracking, ignore)
+	oldest := git.OldestBrnach(tracking, ignore, 14)
 
-	if len(mergedBranches) > 0 {
+	if len(merged) > 0 {
 		fmt.Println("\n\nThese merged branches was suggested clean:")
 	}
-	for _, branch := range mergedBranches {
+	for _, branch := range merged {
+		//TODO: tools 格式化输出，长度补齐
 		if branch.State == git.Merged {
 			fmt.Printf("  %s %s %s \n", branch.Tracking, branch.Name, branch.Commit)
 		} else {
@@ -814,70 +759,16 @@ func needCleanBranch(tracking git.Tracking, ignore string) {
 		}
 	}
 
-	if len(oldestBranches) > 0 {
+	if len(oldest) > 0 {
 		fmt.Println("\n\nThese oldest branches which two weeks not updated was suggested clean:")
 	}
-	for _, branch := range oldestBranches {
+	for _, branch := range oldest {
 		if branch.State == git.Oldest {
-			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.Desc)
+			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.LastDate)
 		} else {
 			logger.Printf("needCleanBranch error logict: unkonw state")
 		}
 	}
-}
-
-func mergedBranches(tracking git.Tracking, ignore string) []git.Branch {
-	var mergedResult string
-	if tracking == git.All {
-		localArray := mergedBranches(git.Local, ignore)
-		remoteArray := mergedBranches(git.Remote, ignore)
-		return append(localArray, remoteArray...)
-	} else if tracking == git.Local {
-		_, resp := excute("git branch --merged", false)
-		mergedResult = resp
-	} else if tracking == git.Remote {
-		_, resp := excute("git branch -r --merged", false)
-		mergedResult = resp
-	}
-	return splitBranch(mergedResult, tracking, ignore, git.Merged)
-}
-
-func oldestBranches(tracking git.Tracking, ignore string) []git.Branch {
-	var oldestResult string
-	var oldBranches []git.Branch
-	if tracking == git.All {
-		localArray := oldestBranches(git.Local, ignore)
-		remoteArray := oldestBranches(git.Remote, ignore)
-		return append(localArray, remoteArray...)
-	} else if tracking == git.Local {
-		_, resp := excute("git branch", false)
-		oldestResult = resp
-	} else if tracking == git.Remote {
-		_, resp := excute("git branch -r", false)
-		oldestResult = resp
-	}
-	branches := splitBranch(oldestResult, tracking, ignore, git.Oldest)
-	for _, branch := range branches {
-		_, ctStr := excute("git log --pretty=format:“%ct” "+branch.Commit+" -1", false)
-		ctStr = strings.Replace(ctStr, "“", "", -1)
-		ctStr = strings.Replace(ctStr, "”", "", -1)
-		//TODO: 数字提取正则
-		ct, err := strconv.ParseInt(ctStr, 10, 64)
-		if err == nil && checkOutDate(ct, 24*14) {
-			//以下分支超两周未更新，建议确认后清理
-			// fmt.Printf("oldest branch(%s %s %s) : \n", tracking, branch.Name, branch.Commit)
-			_, auth := excute("git log --pretty=format:“%aN” "+branch.Commit+" -1", false)
-			auth = strings.Replace(auth, "“", "", -1)
-			auth = strings.Replace(auth, "”", "", -1)
-			// _, email := excute("git log --pretty=format:“%ae” "+branch.Commit+" -1", false)
-			// email = strings.Replace(email, "“", "", -1)
-			// email = strings.Replace(email, "”", "", -1)
-			// branch.Desc = "Auth:" + auth + " Email:" + email
-			branch.Desc = "@" + auth
-			oldBranches = append(oldBranches, branch)
-		}
-	}
-	return oldBranches
 }
 
 // 检测时间是是否过期，与当前时间比对， ct：比对时间， gap：间隔，单位小时
