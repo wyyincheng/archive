@@ -3,6 +3,7 @@ package git
 import (
 	"archive/tools"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -20,25 +21,32 @@ func CommitForLog(log string) *Commit {
 	  3.short  logs: git branch -v
 	*/
 
+	if len(log) > 0 {
+		//FIXME: git show
+		reg := regexp.MustCompile(`commit [\w]+`)
+		resutl := reg.FindString(log)
+		commit := strings.Replace(resutl, "commit ", "", -1)
+		if len(commit) > 0 {
+			return CommitForID(commit)
+		}
+		return nil
 
-
-	// if len(log) > 0 {
-	// 	commitInfos := strings.Split(log, "\n")
-	// 	for _, commit := range commitInfos {
-	// 		trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
-	// 		var name = branch.Name
-	// 		if branch.Tracking == Remote {
-	// 			name = branch.Remote + "/" + branch.Name
-	// 		}
-	// 		if strings.HasPrefix(trimStr, name) {
-	// 			infos := strings.Replace(trimStr, name+" ", "", 1)
-	// 			reg := regexp.MustCompile(`[\w]+`)
-	// 			cmt := reg.FindString(infos)
-	// 			// logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
-	// 			branch.Commit = cmt
-	// 		}
-	// 	}
-	// }
+		// 	commitInfos := strings.Split(log, "\n")
+		// 	for _, commit := range commitInfos {
+		// 		trimStr := strings.Trim(strings.Trim(commit, "*"), " ")
+		// 		var name = branch.Name
+		// 		if branch.Tracking == Remote {
+		// 			name = branch.Remote + "/" + branch.Name
+		// 		}
+		// 		if strings.HasPrefix(trimStr, name) {
+		// 			infos := strings.Replace(trimStr, name+" ", "", 1)
+		// 			reg := regexp.MustCompile(`[\w]+`)
+		// 			cmt := reg.FindString(infos)
+		// 			// logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
+		// 			branch.Commit = cmt
+		// 		}
+		// 	}
+	}
 
 	return nil
 }

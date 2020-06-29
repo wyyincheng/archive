@@ -12,18 +12,18 @@ func init() {
 
 }
 
-// DelteBranch 删除一组分支
-func DelteBranch(list []*Branch) []*Branch {
+// DelteBranches 删除一组分支
+func DelteBranches(list []*Branch) []*Branch {
 	var deltedList []*Branch
 	for _, branch := range list {
-		deleted := Delete(branch)
+		deleted := DeleteBranch(branch)
 		deltedList = append(deltedList, deleted)
 	}
 	return deltedList
 }
 
-// Delete 删除指定分支
-func Delete(branch *Branch) *Branch {
+// DeleteBranch 删除指定分支
+func DeleteBranch(branch *Branch) *Branch {
 
 	//当前分支无法被删除
 	result, current := tools.Excute("git symbolic-ref --short -q HEAD")
@@ -175,7 +175,7 @@ func splitBranch(result string, tracking Tracking, ignore string, state State) [
 			continue
 		}
 
-		branch := ignoreMatch(name, tracking, ignore)
+		branch := ignoreBranchMatch(name, tracking, ignore)
 		if branch.State == Ignore {
 			// 		// fmt.Printf("splitBranch ignore branch(%s %s %s) : \n", tracking, branch, commit)
 			// 		// logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
@@ -228,7 +228,7 @@ func fetchLatestCommit(branch *Branch) *Branch {
 }
 
 // ignore正则匹配：是否符合忽略要求
-func ignoreMatch(name string, tracking Tracking, ignore string) *Branch {
+func ignoreBranchMatch(name string, tracking Tracking, ignore string) *Branch {
 	var state State
 	var remote string
 	var branchName string

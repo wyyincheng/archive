@@ -270,7 +270,7 @@ func buildCLI() {
 						readyArchive("clean_tag")
 						excute("git fetch", false)
 						if clean == false {
-							showIllegalTags(tracking, ignore)
+							needCleanTag(tracking, ignore)
 							return nil
 						}
 
@@ -642,102 +642,29 @@ func abort(action string, commit string) {
 	}
 }
 
-func needCleanTag(tracking git.Tracking, ignore string) []Tag {
-	return fetchProjectTags(tracking, ignore)
-}
+func needCleanTag(tracking git.Tracking, ignore string) {
+	//TODO: config 忽略版本tag
+	ignore = ignore + "|v([0-9]+\\.[0-9]+\\.[0-9])"
+	tags := git.AllTag(tracking, ignore)
 
-func fetchProjectTags(tracking git.Tracking, ignore string) []Tag {
-
-	var tagsResult string
-	if tracking == git.All {
-		localArray := fetchProjectTags(git.Local, ignore)
-		remoteArray := fetchProjectTags(git.Remote, ignore)
-		return append(localArray, remoteArray...)
-	} else if tracking == git.Local {
-		_, resp := excute("git tag -l", false)
-		tagsResult = resp
-	} else if tracking == git.Remote {
-		_, resp := excute("git ls-remote --tags", false)
-		tagsResult = resp
+	if len(tags) > 0 {
+		fmt.Println("\n\nThese tag was suggested clean:")
 	}
-	return splitTag(tagsResult, tracking, ignore)
-}
-
-func splitTag(result string, tracking git.Tracking, ignore string) []Tag {
-	//追加保护tag config.tagRule
-	// ignore = ignore + "|" + config.tagRule
-	var resultTags []Tag
-	resultArray := strings.Split(result, "\n")
-	for _, info := range resultArray {
-		if tracking == git.Remote {
-			if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
-				list := strings.Split(info, "refs/tags/")
-				commit := strings.Trim(strings.Replace(list[0], " ", "", -1), " ")
-				tag := list[len(list)-1]
-				remoteTag := "refs/tags/" + tag
-				if checkTagLegal(tag) == false {
-
-					reg := regexp.MustCompile(ignore)
-					resutl := reg.FindString(tag)
-					if resutl == tag {
-						fmt.Printf("ignore tag (%s %s %s)\n", tracking, tag, commit)
-						continue
-					}
-
-					resultTags = append(resultTags, Tag{
-						Name:     remoteTag,
-						Tracking: tracking,
-						State:    git.Suggest,
-						Commit:   commit,
-					})
-				}
-			}
-		} else if tracking == git.Local {
-			lacalTag := info
-			if checkTagLegal(lacalTag) == false {
-				commit := fetchLatestCommit("tag", lacalTag, tracking)
-				reg := regexp.MustCompile(ignore)
-				resutl := reg.FindString(lacalTag)
-				if resutl == lacalTag {
-					fmt.Printf("ignore tag (%s %s %s)", tracking, lacalTag, commit)
-					continue
-				}
-				resultTags = append(resultTags, Tag{
-					Name:     lacalTag,
-					Tracking: tracking,
-					State:    git.Suggest,
-					Commit:   commit,
-				})
-			}
-		}
-	}
-	return resultTags
-}
-
-func showIllegalTags(tracking git.Tracking, ignore string) {
-	illegalTags := needCleanTag(tracking, ignore)
-	if len(illegalTags) > 0 {
-		fmt.Println("\n\nThese illegal tags was suggested clean:")
-	} else {
-		fmt.Println("\n\nGood, every tag is legal.")
-	}
-	for _, tag := range illegalTags {
-		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit)
+	for _, tag := range tags {
+		//TODO: tools 格式化输出，长度补齐
+		fmt.Printf("  %s %s %s \n", tag.Tracking, tag.Name, tag.Commit.Commit)
 	}
 }
 
 func cleanTag(tracking git.Tracking, ignore string) {
-	// git tag -d 0.0.1 //删除本地tag
-	// git push origin :refs/tags/0.0.1 //删除远程tag
-	tags := needCleanTag(tracking, ignore)
-	for _, tag := range tags {
-		deleteTag(tag)
-	}
+	tags := git.AllTag(tracking, ignore)
+	tags = git.DelteTags(tags)
+	archiveInfo.Tags = tags
 }
 
 func cleanBranch(tracking git.Tracking, ignore string) {
 	list := git.MergedBranch(tracking, ignore)
-	list = git.DelteBranch(list)
+	list = git.DelteBranches(list)
 	archiveInfo.Branches = list
 }
 
@@ -776,29 +703,6 @@ func checkOutDate(ct int64, gap float64) bool {
 	tm := time.Unix(ct, 0)
 	diff := time.Now().Sub(tm).Hours()
 	return diff > gap
-}
-
-func deleteTag(tag Tag) {
-	var state git.State = git.Ignore
-	if tag.State != git.Ignore {
-		success, _ := excute("git tag -d "+strings.Replace(tag.Name, "refs/tags/", "", -1), false)
-		if success {
-			pSuccess, _ := excute("git push origin :"+tag.Name, false)
-			if pSuccess {
-				state = git.Deleted
-			} else {
-				state = git.Error
-			}
-		} else {
-			state = git.Error
-		}
-	}
-	archiveInfo.Tags = append(archiveInfo.Tags, Tag{
-		Name:     tag.Name,
-		Tracking: tag.Tracking,
-		State:    state,
-		Commit:   tag.Commit,
-	})
 }
 
 func lock() {
@@ -989,9 +893,14 @@ func test(target string, vtag string) {
 	// fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
 	// }
 
-	list := git.AllBranch(git.All, "v([0-9]+\\.[0-9]+\\.[0-9])")
-	for _, branch := range list {
-		fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
+	// list := git.AllBranch(git.All, "v([0-9]+\\.[0-9]+\\.[0-9])")
+	// for _, branch := range list {
+	// 	fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
+	// }
+
+	list := git.AllTag(git.All, "vd([0-9]+\\.[0-9]+\\.[0-9])")
+	for _, tag := range list {
+		fmt.Printf("name:%s ,last:%s\n", tag.Name, tag.LastDate)
 	}
 
 	// commit := git.CommitForID("49701485c554926543bbeac506ddd33ac3849d06")
@@ -1032,18 +941,10 @@ type Archive struct {
 	User     string
 	Email    string
 	Branches []*git.Branch
-	Tags     []Tag
+	Tags     []*git.Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
 	Log      string
-}
-
-//Tag tag信息
-type Tag struct {
-	Name     string
-	Commit   string
-	Tracking git.Tracking
-	State    git.State
 }
 
 // Frequency check update frequency
