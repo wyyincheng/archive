@@ -555,7 +555,7 @@ func merge(target string, vtag string) bool {
 		mergeSuccess, _ := excute("git merge --no-ff "+branch, true)
 		if mergeSuccess {
 			excute("git push", false)
-			archiveInfo.Branches = append(archiveInfo.Branches, git.Branch{
+			archiveInfo.Branches = append(archiveInfo.Branches, &git.Branch{
 				Name:     branch,
 				Tracking: git.Remote,
 				State:    git.Merged,
@@ -776,111 +776,6 @@ func checkOutDate(ct int64, gap float64) bool {
 	tm := time.Unix(ct, 0)
 	diff := time.Now().Sub(tm).Hours()
 	return diff > gap
-}
-
-func splitBranch(result string, tracking git.Tracking, ignore string, state git.State) []git.Branch {
-	//追加默认分支、保护分支
-	ignore = ignore + "|master"
-	var resultBranches []git.Branch
-	resultArray := strings.Split(result, "\n")
-	for _, info := range resultArray {
-		trimStr := strings.Trim(info, " ")
-		branchInfo := strings.Replace(trimStr, "*", "", -1)
-		branch := strings.Trim(branchInfo, " ")
-		if len(branch) == 0 {
-			continue
-		}
-
-		commit := fetchLatestCommit("branch", branch, tracking)
-		result, _, _ := checkBranch(branch, tracking, ignore)
-		if result == git.Ignore {
-			// fmt.Printf("splitBranch ignore branch(%s %s %s) : \n", tracking, branch, commit)
-			// logger.Printf("ignore clean branch(%s %s %s) : \n", tracking, branch, commit)
-			continue
-		}
-
-		resultBranches = append(resultBranches, git.Branch{
-			Name:     branch,
-			Tracking: tracking,
-			State:    state,
-			Commit:   commit,
-		})
-	}
-	return resultBranches
-}
-
-func checkBranch(branch string, tracking git.Tracking, ignore string) (git.State, string, string) {
-	var success = git.Suggest
-	var remote = ""
-	var name = branch
-	if tracking == git.All {
-		saveArchive()
-		logger.Fatalf("check branch error: (%s %s)\n", tracking, branch)
-	} else if tracking == git.Local {
-
-		reg := regexp.MustCompile(ignore)
-		resutl := reg.FindString(branch)
-		if resutl == name {
-			return git.Ignore, remote, name
-		}
-	} else if tracking == git.Remote {
-		reg := regexp.MustCompile(`[\w]+`)
-		remote = reg.FindString(branch)
-		name = strings.Replace(branch, remote+"/", "", 1)
-
-		breg := regexp.MustCompile(ignore)
-		resutl := breg.FindString(name)
-		if resutl == name {
-			return git.Ignore, remote, name
-		}
-	}
-	return success, remote, name
-}
-
-func deleteBranch(branch string, tracking git.Tracking, ignore string) git.State {
-	var success = git.Error
-	if tracking == git.All {
-		saveArchive()
-		logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
-	} else if tracking == git.Local {
-
-		reg := regexp.MustCompile(ignore)
-		resutl := reg.FindString(branch)
-		if resutl == branch {
-			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
-			return git.Ignore
-		}
-
-		reuslt, _ := excute("git branch -d "+branch, true)
-		if reuslt == true {
-			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
-			success = git.Success
-		} else {
-			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
-			success = git.Error
-		}
-	} else if tracking == git.Remote {
-		reg := regexp.MustCompile(`[\w]+`)
-		remote := reg.FindString(branch)
-		name := strings.Replace(branch, remote+"/", "", 1)
-
-		breg := regexp.MustCompile(ignore)
-		resutl := breg.FindString(name)
-		if resutl == name {
-			fmt.Printf("  ignore branch success(%s %s) : \n", tracking, branch)
-			return git.Ignore
-		}
-
-		reuslt, _ := excute("git push "+remote+" --delete "+name, true)
-		if reuslt == true {
-			fmt.Printf("  delete branch success(%s %s) : \n", tracking, branch)
-			success = git.Success
-		} else {
-			fmt.Printf("  delete branch failure(%s %s) : \n", tracking, branch)
-			success = git.Error
-		}
-	}
-	return success
 }
 
 func deleteTag(tag Tag) {
