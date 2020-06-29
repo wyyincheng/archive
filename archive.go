@@ -30,7 +30,6 @@ var (
 		Status: 0,
 	}
 	archivePath string
-	logger      *log.Logger
 	logPath     string
 )
 
@@ -41,7 +40,7 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		saveArchive()
-		logger.Fatal(err)
+		fmt.Printf("App Error:", err)
 	}
 }
 
@@ -436,37 +435,37 @@ func buildCLI() {
 
 func backupBranch(tracking git.Tracking, ignore string) {
 	list := git.AllBranch(tracking, ignore)
-	logger.Printf("backup branches:%v\n", list)
+	// fmt.Printf("backup branches:%v\n", list)
 	infoJSON, _ := json.Marshal(list)
-	logger.Printf("backup branches json:%s\n", infoJSON)
+	// fmt.Printf("backup branches json:%s\n", infoJSON)
 	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_branch.json")
 	write(infoJSON, backupPath)
 }
 
 func backupTag(tracking git.Tracking, ignore string) {
 	list := git.AllTag(tracking, ignore)
-	logger.Printf("backup tags:%v\n", list)
+	// fmt.Printf("backup tags:%v\n", list)
 	infoJSON, _ := json.Marshal(list)
-	logger.Printf("backup tags json:%s\n", infoJSON)
+	// fmt.Printf("backup tags json:%s\n", infoJSON)
 	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_tag.json")
 	write(infoJSON, backupPath)
 }
 
 func buildLogger(logName string) {
-	logPath = path.Join(config.WorkSpace, "Logs", logName+"_"+strconv.FormatInt(time.Now().Unix(), 10)+".log")
-	dirPath := path.Dir(logPath)
-	mkErr := os.MkdirAll(dirPath, os.ModePerm)
-	if mkErr != nil {
-		fmt.Printf("mkdir log folder err : '%s'\n", mkErr)
-		return
-	}
-	logfile, err := os.Create(logPath)
-	if err != nil {
-		fmt.Printf("create log file err : '%s'\n", mkErr)
-		return
-	}
+	// logPath = path.Join(config.WorkSpace, "Logs", logName+"_"+strconv.FormatInt(time.Now().Unix(), 10)+".log")
+	// dirPath := path.Dir(logPath)
+	// mkErr := os.MkdirAll(dirPath, os.ModePerm)
+	// if mkErr != nil {
+	// 	fmt.Printf("mkdir log folder err : '%s'\n", mkErr)
+	// 	return
+	// }
+	// logfile, err := os.Create(logPath)
+	// if err != nil {
+	// 	fmt.Printf("create log file err : '%s'\n", mkErr)
+	// 	return
+	// }
 
-	logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
+	// logger = log.New(logfile, "", log.LstdFlags|log.Llongfile)
 }
 
 func readyArchive(logName string) {
@@ -489,7 +488,7 @@ func archive(target string, vtag string) {
 	checkCMD("git")
 	if checkTagAvailable(vtag) == false {
 		fmt.Printf("%s is not available, check and retry.\n", vtag)
-		logger.Fatalf("%s is not available, check and retry.\n", vtag)
+		log.Fatalf("%s is not available, check and retry.\n", vtag)
 		return
 	}
 
@@ -520,7 +519,7 @@ func publishTag(branch string, vtag string) {
 		excute("git tag -d "+vtag, false)
 	}
 	_, info := excute("git show "+vtag, true)
-	logger.Printf("auto publih tag '%s':\n'%s'\n", vtag, info)
+	fmt.Printf("auto publih tag '%s':\n'%s'\n", vtag, info)
 }
 
 func checkTagAvailable(vtag string) bool {
@@ -619,7 +618,7 @@ func fetchLatestCommit(sort string, info string, tracking git.Tracking) string {
 					infos := strings.Replace(trimStr, info+" ", "", 1)
 					reg := regexp.MustCompile(`[\w]+`)
 					cmt := reg.FindString(infos)
-					logger.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
+					fmt.Printf("'%s' '%s' '%s' fetch latest commit : '%s' \n", sort, info, tracking, cmt)
 					return cmt
 				}
 			}
@@ -633,7 +632,7 @@ func fetchLatestCommit(sort string, info string, tracking git.Tracking) string {
 			return commit
 		}
 	}
-	logger.Printf("'%s' '%s' '%s' fetch latest commit failure \n", sort, info, tracking)
+	fmt.Printf("'%s' '%s' '%s' fetch latest commit failure \n", sort, info, tracking)
 	return ""
 }
 
@@ -696,7 +695,7 @@ func needCleanBranch(tracking git.Tracking, ignore string) {
 		if branch.State == git.Merged {
 			fmt.Printf("  %s %s %s \n", branch.Tracking, branch.Name, branch.Commit)
 		} else {
-			logger.Printf("needCleanBranch error logict: unkonw state")
+			fmt.Printf("needCleanBranch error logict: unkonw state")
 		}
 	}
 
@@ -707,7 +706,7 @@ func needCleanBranch(tracking git.Tracking, ignore string) {
 		if branch.State == git.Oldest {
 			fmt.Printf("  %s %s %s %s\n", branch.Tracking, branch.Name, branch.Commit, branch.LastDate)
 		} else {
-			logger.Printf("needCleanBranch error logict: unkonw state")
+			fmt.Printf("needCleanBranch error logict: unkonw state")
 		}
 	}
 }
@@ -730,13 +729,13 @@ func checkCMD(cmd string) {
 	_, err := exec.LookPath(cmd)
 	if err != nil {
 		saveArchive()
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 }
 
 func excute(cmdStr string, silent bool) (bool, string) {
 	// fmt.Printf("cmd run: '%s'\n", cmdStr)
-	logger.Println(cmdStr)
+	fmt.Println(cmdStr)
 	branches := strings.Split(cmdStr, " ")
 	cmd := exec.Command(branches[0], branches[1:]...)
 	// cmd := exec.Command(name, arg...)
@@ -746,23 +745,23 @@ func excute(cmdStr string, silent bool) (bool, string) {
 	err := cmd.Run()
 	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
 	if err != nil {
-		logger.Println(errStr)
+		fmt.Println(errStr)
 		if silent == false {
 			saveArchive()
 			//静默处理：正常返回处理结果，不结束程序
-			logger.Fatal(err)
+			log.Fatal(err)
 		}
 		return false, errStr
 	}
-	logger.Println(outStr)
+	fmt.Println(outStr)
 	//TODO: log 、 notification
 	return true, outStr
 }
 
 func saveArchive() {
-	logger.Printf("save archive:%v\n", archiveInfo)
+	fmt.Printf("save archive:%v\n", archiveInfo)
 	infoJSON, _ := json.Marshal(archiveInfo)
-	logger.Printf("save archive json:%s\n", infoJSON)
+	fmt.Printf("save archive json:%s\n", infoJSON)
 	archivePath = path.Join(config.WorkSpace, "backup", archiveInfo.Tag+".json")
 	write(infoJSON, archivePath)
 }
@@ -779,15 +778,18 @@ func write(json []byte, filePath string) {
 		mkErr := os.MkdirAll(dirPath, os.ModePerm)
 		if mkErr != nil {
 			saveArchive()
-			logger.Fatal(mkErr)
+			log.Fatal(mkErr)
+			// fmt.Fatal(mkErr)
 			return
 		}
 		writeErr := ioutil.WriteFile(filePath, json, os.ModePerm)
 		if writeErr != nil {
 			saveArchive()
-			logger.Fatal(writeErr)
+			log.Fatal(writeErr)
+			// fmt.Fatal(writeErr)
 			return
 		}
+		fmt.Printf("✅ save file success：\n", filePath)
 	}
 }
 
@@ -807,13 +809,13 @@ func loadConfig() {
 	_, err := os.Stat(configFile)
 	if os.IsNotExist(err) {
 		//初始化
-		logger.Printf("'%s' no exist.\n", configFile)
+		fmt.Printf("'%s' no exist.\n", configFile)
 		config.WorkSpace = configPath
 		config.LatestCheck = time.Now()
 		config.UpdateVersion = Day
 		config.Version = appVersion
 		saveConfig(config)
-		logger.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
+		fmt.Printf("Default archive config constructor success! You can update it on path '%s'\n", configFile)
 		return
 	}
 
@@ -821,14 +823,14 @@ func loadConfig() {
 	if err != nil {
 		//Log load config failure
 		saveArchive()
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 	var localConfig Config
 	err = json.Unmarshal(data, &localConfig)
 	if err != nil {
 		//Log load config failure
 		saveArchive()
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 	config = localConfig
 }
@@ -836,7 +838,7 @@ func loadConfig() {
 func localTime() string {
 	local, err := time.LoadLocation("Local")
 	if err != nil {
-		logger.Printf("format lcoal time failure: '%s'", err)
+		fmt.Printf("format lcoal time failure: '%s'", err)
 		return time.Now().String()
 	}
 	return time.Now().In(local).Format("202005010-15:04:05")
@@ -864,12 +866,12 @@ func updateVersion() {
 
 	resp, err := http.Get("https://api.github.com/repos/wyyincheng/archive/releases/latest")
 	if err != nil {
-		logger.Printf("check cli version failure(0): '%s'", err)
+		fmt.Printf("check cli version failure(0): '%s'", err)
 	} else {
 		var data map[string]interface{}
 		jsonErr := json.NewDecoder(resp.Body).Decode(&data)
 		if jsonErr != nil {
-			logger.Printf("check cli version failure(1): '%s'", jsonErr)
+			fmt.Printf("check cli version failure(1): '%s'", jsonErr)
 			// resp.Body.Close()
 			return
 		}
@@ -912,10 +914,12 @@ func test(target string, vtag string) {
 	// 	fmt.Printf("name:%s ,last:%s\n", branch.Name, branch.LastDate)
 	// }
 
-	list := git.AllTag(git.All, "vd([0-9]+\\.[0-9]+\\.[0-9])")
-	for _, tag := range list {
-		fmt.Printf("name:%s ,last:%s\n", tag.Name, tag.LastDate)
-	}
+	// list := git.AllTag(git.All, "vd([0-9]+\\.[0-9]+\\.[0-9])")
+	// for _, tag := range list {
+	// 	fmt.Printf("name:%s ,last:%s\n", tag.Name, tag.LastDate)
+	// }
+
+	needCleanTag(git.All, "")
 
 	// commit := git.CommitForID("49701485c554926543bbeac506ddd33ac3849d06")
 	// fmt.Printf("commit: %s", commit.Commit)
