@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	appVersion  = "v0.0.10-beta"
+	appVersion  = "v0.0.11"
 	configPath  = "/usr/local/share/YCLI/Archive"
 	app         = cli.NewApp()
 	config      = Config{}
@@ -438,7 +438,7 @@ func backupBranch(tracking git.Tracking, ignore string) {
 	// fmt.Printf("backup branches:%v\n", list)
 	infoJSON, _ := json.Marshal(list)
 	// fmt.Printf("backup branches json:%s\n", infoJSON)
-	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_branch.json")
+	backupPath := path.Join(config.WorkSpace, "backup", tools.String(archiveInfo.Time), "back_branch.json")
 	write(infoJSON, backupPath)
 }
 
@@ -447,7 +447,7 @@ func backupTag(tracking git.Tracking, ignore string) {
 	// fmt.Printf("backup tags:%v\n", list)
 	infoJSON, _ := json.Marshal(list)
 	// fmt.Printf("backup tags json:%s\n", infoJSON)
-	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_tag.json")
+	backupPath := path.Join(config.WorkSpace, "backup", tools.String(archiveInfo.Time), "back_tag.json")
 	write(infoJSON, backupPath)
 }
 
@@ -471,7 +471,7 @@ func buildLogger(logName string) {
 func readyArchive(logName string) {
 	buildLogger(logName)
 	archiveInfo.Log = logPath
-	archiveInfo.Tag = localTime()
+	archiveInfo.Tag = tools.String(archiveInfo.Time)
 	archiveInfo.User = strings.Trim(gitConfig("user.name"), "\n")
 	archiveInfo.Email = strings.Trim(gitConfig("user.email"), "\n")
 }
@@ -833,15 +833,6 @@ func loadConfig() {
 		log.Fatal(err)
 	}
 	config = localConfig
-}
-
-func localTime() string {
-	local, err := time.LoadLocation("Local")
-	if err != nil {
-		fmt.Printf("format lcoal time failure: '%s'", err)
-		return time.Now().String()
-	}
-	return time.Now().In(local).Format("202005010-15:04:05")
 }
 
 func updateVersion() {
