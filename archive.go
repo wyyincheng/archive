@@ -87,12 +87,12 @@ func buildCLI() {
 			Value:   "niuwa-ios",
 			Usage:   "Project you will archive.",
 		},
-		&cli.StringFlag{
-			Name:    "into",
-			Value:   "master",
-			Aliases: []string{"i"},
-			Usage:   "archive version code into which branch.",
-		},
+		// &cli.StringFlag{
+		// 	Name:    "into",
+		// 	Value:   "master",
+		// 	Aliases: []string{"i"},
+		// 	Usage:   "archive version code into which branch.",
+		// },
 		&cli.StringFlag{
 			Name:    "tag",
 			Aliases: []string{"t"},
@@ -436,15 +436,20 @@ func buildCLI() {
 
 func backupBranch(tracking git.Tracking, ignore string) {
 	list := git.AllBranch(tracking, ignore)
-	logger.Printf("backup branch:%v\n", list)
+	logger.Printf("backup branches:%v\n", list)
 	infoJSON, _ := json.Marshal(list)
-	logger.Printf("backup branch json:%s\n", infoJSON)
+	logger.Printf("backup branches json:%s\n", infoJSON)
 	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_branch.json")
 	write(infoJSON, backupPath)
 }
 
 func backupTag(tracking git.Tracking, ignore string) {
-
+	list := git.AllTag(tracking, ignore)
+	logger.Printf("backup tags:%v\n", list)
+	infoJSON, _ := json.Marshal(list)
+	logger.Printf("backup tags json:%s\n", infoJSON)
+	backupPath := path.Join(config.WorkSpace, "backup", tools.String(time.Now().Unix()), "back_tag.json")
+	write(infoJSON, backupPath)
 }
 
 func buildLogger(logName string) {
