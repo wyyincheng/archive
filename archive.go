@@ -649,7 +649,11 @@ func abort(action string, commit string) {
 
 func needCleanTag(tracking git.Tracking, ignore string) {
 	//TODO: config 忽略版本tag
-	ignore = ignore + "|v([0-9]+\\.[0-9]+\\.[0-9])"
+	if len(ignore) == 0 {
+		ignore = "v([0-9]+\\.[0-9]+\\.[0-9])"
+	} else {
+		ignore = ignore + "|v([0-9]+\\.[0-9]+\\.[0-9])"
+	}
 	tags := git.AllTag(tracking, ignore)
 
 	if len(tags) > 0 {

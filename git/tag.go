@@ -83,7 +83,7 @@ func splitTag(result string, tracking Tracking, ignore string, state State) []*T
 		var tagName string
 		var commit *Commit
 		if tracking == Remote {
-			if strings.HasPrefix(info, "From ") == false && len(tools.TrimBoth(info)) > 0 {
+			if strings.HasPrefix(info, "From ") == false && len(info) > 0 {
 				list := strings.Split(info, "refs/tags/")
 				commitID := tools.TrimBoth(list[0])
 				commit = CommitForID(commitID)
