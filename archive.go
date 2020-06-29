@@ -1136,7 +1136,7 @@ type Archive struct {
 	Commit   string
 	User     string
 	Email    string
-	Branches []git.Branch
+	Branches []*git.Branch
 	Tags     []Tag
 	Time     int64
 	Status   int //0 默认状态，1 已还原，必要时可被删除
