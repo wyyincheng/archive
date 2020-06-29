@@ -1,4 +1,4 @@
-module archive
+module nwarchive
 
 go 1.13
 
