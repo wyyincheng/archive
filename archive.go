@@ -666,6 +666,11 @@ func needCleanTag(tracking git.Tracking, ignore string) {
 }
 
 func cleanTag(tracking git.Tracking, ignore string) {
+	if len(ignore) == 0 {
+		ignore = "v([0-9]+\\.[0-9]+\\.[0-9])"
+	} else {
+		ignore = ignore + "|v([0-9]+\\.[0-9]+\\.[0-9])"
+	}
 	tags := git.AllTag(tracking, ignore)
 	tags = git.DelteTags(tags)
 	archiveInfo.Tags = tags
