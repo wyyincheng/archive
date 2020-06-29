@@ -43,26 +43,26 @@ func DeleteBranch(branch *Branch) *Branch {
 	if branch.Tracking == Local {
 		reuslt, info := tools.Excute("git branch -d " + branch.Name)
 		if reuslt == true {
-			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
+			fmt.Printf(" ✅ delete branch success(%s %s)\n", branch.Tracking, branch.Name)
 			branch.State = Deleted
 		} else {
-			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			fmt.Printf(" ❌ delete branch failure(%s %s) : %s\n", branch.Tracking, branch.Name, info)
 			branch.Desc = "Delete Failure:" + info
 			branch.State = Error
 		}
 	} else if branch.Tracking == Remote {
 		reuslt, info := tools.Excute("git push " + branch.Remote + " --delete " + branch.Name)
 		if reuslt == true {
-			fmt.Printf("  delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
+			fmt.Printf(" ✅ delete branch success(%s %s) : \n", branch.Tracking, branch.Name)
 			branch.State = Deleted
 		} else {
-			fmt.Printf("  delete branch failure(%s %s) : \n", branch.Tracking, branch.Name)
+			fmt.Printf(" ❌ delete branch failure(%s %s) : %s\n", branch.Tracking, branch.Name, info)
 			branch.Desc = "Delete Failure:" + info
 			branch.State = Error
 		}
 	} else {
 		// logger.Fatalf("delete branch error: (%s %s)\n", tracking, branch)
-		fmt.Printf("  delete branch error(%s %s) : \n", branch.Tracking, branch.Name)
+		fmt.Printf(" ❌ delete branch error(%s %s) : Miss Tracking\n", branch.Tracking, branch.Name)
 		branch.Desc = "Miss Tracking"
 		branch.State = Error
 	}

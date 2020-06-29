@@ -2,6 +2,7 @@ package git
 
 import (
 	"archive/tools"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -38,14 +39,17 @@ func DeleteTag(tag *Tag) *Tag {
 		if success {
 			pSuccess, result := tools.Excute("git push origin :" + tag.Name)
 			if pSuccess {
+				fmt.Printf(" ✅ delete tag success(%s %s) : \n", tag.Tracking, tag.Name)
 				tag.State = Deleted
 			} else {
 				tag.State = Error
 				tag.Desc = "Delete Failure::" + result
+				fmt.Printf(" ❌ delete tag failure(%s %s) : %s\n", tag.Tracking, tag.Name, result)
 			}
 		} else {
 			tag.State = Error
 			tag.Desc = "Delete Failure:" + info
+			fmt.Printf(" ❌ delete tag failure(%s %s) : %s\n", tag.Tracking, tag.Name, info)
 		}
 	}
 	return tag
