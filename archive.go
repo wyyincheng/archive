@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	appVersion  = "v0.0.11"
+	appVersion  = "v0.0.12"
 	configPath  = "/usr/local/share/YCLI/Archive"
 	app         = cli.NewApp()
 	config      = Config{}
@@ -40,12 +40,12 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		saveArchive()
-		fmt.Printf("App Error:", err)
+		fmt.Printf("App Error:%s\n", err)
 	}
 }
 
 func buildCLI() {
-	app.Name = "archive"
+	app.Name = "nwarchive"
 	app.Usage = "archive appstore latest version which has been published."
 	app.Action = func(c *cli.Context) error {
 
